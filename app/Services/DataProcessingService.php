@@ -162,6 +162,8 @@ class DataProcessingService
                     $quantity ?? '',
                 ];
 
+                $values = $this->applyCtcxSkuRules($values, $sku, $productSpecs, $colorLookup);
+
                 for ($column = 0; $column < count($headers); $column++) {
                     if ($column === 2) {
                         $this->setCellValueOrImage($outputSheet, $column, $outputRow, $values[$column] ?? '', $imageTempFiles, $embeddedImages['by_row'][$row] ?? null);
@@ -169,6 +171,12 @@ class DataProcessingService
                     }
 
                     $outputSheet->setCellValueByColumnAndRow($column, $outputRow, $values[$column] ?? '');
+
+                    if ($column === 19 && !empty($values[$column])) {
+                        $outputSheet->getStyleByColumnAndRow($column, $outputRow)
+                            ->getAlignment()
+                            ->setWrapText(true);
+                    }
                 }
 
                 $outputRow++;
@@ -203,9 +211,132 @@ class DataProcessingService
         }
     }
 
+    // 未使用（原来的测试方法后改为彩图刺绣入口）
     public function processOrderFile($sourceFilePath)
     {
         return $this->processOrderFileCTCX($sourceFilePath);
+    }
+
+    private function applyCtcxSkuRules(array $values, $sku, $productSpecs, array $colorLookup)
+    {
+        $sku = (string) $sku;
+        $attributes = $this->parseOrderedAttributesAfter($productSpecs, 3);
+
+        if (strpos($sku, 'CS-QK0743-CX') !== false) {
+            $chestTextLines = [];
+
+            foreach ($attributes as $attribute) {
+                if (stripos($attribute['name'], 'State Options') !== false) {
+                    $chestTextLines[] = '第一行：' . $attribute['value'];
+                }
+
+                if (stripos($attribute['name'], 'Year') !== false) {
+                    $chestTextLines[] = '第二行：' . $attribute['value'];
+                }
+
+                if (stripos($attribute['name'], 'Text Thread Color') !== false) {
+                    $values[21] = $this->translateLookupValue($attribute['value'], $colorLookup);
+                }
+            }
+
+            if (!empty($chestTextLines)) {
+                $values[19] = implode("\n", $chestTextLines);
+            }
+
+            $values[26] = '胸部中央';
+        }
+
+        if (strpos($sku, 'CS-QK2571-CX') !== false) {
+            $values[20] = '全彩';
+
+            foreach ($attributes as $attribute) {
+                if (stripos($attribute['name'], 'Thread Color') !== false) {
+                    $values[17] = $attribute['value'];
+                }
+
+                if (stripos($attribute['name'], 'Embroidery Position') !== false) {
+                    $values[26] = $this->mapEmbroideryPosition($attribute['value']);
+                }
+
+                if (stripos($attribute['name'], 'Photo') !== false) {
+                    $values[22] = $attribute['value'];
+                }
+            }
+        }
+
+        return $values;
+    }
+
+    private function parseOrderedAttributesAfter($specs, $skipCount)
+    {
+        if (empty($specs)) {
+            return [];
+        }
+
+        $attributes = [];
+        $lines = preg_split('/\r\n|\n|\r/', trim((string) $specs));
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '' || strpos($line, ':') === false) {
+                continue;
+            }
+
+            list($name, $value) = explode(':', $line, 2);
+            $attributes[] = [
+                'name' => trim($name),
+                'value' => trim($value),
+            ];
+        }
+
+        return array_slice($attributes, $skipCount);
+    }
+
+    private function translateLookupValue($value, array $lookup)
+    {
+        $value = trim((string) $value);
+
+        if ($value === '') {
+            return '';
+        }
+
+        if (isset($lookup[$value])) {
+            return $lookup[$value];
+        }
+
+        foreach ($lookup as $key => $translated) {
+            if (strcasecmp($value, (string) $key) === 0) {
+                return $translated;
+            }
+        }
+
+        foreach ($lookup as $key => $translated) {
+            if ($key !== '' && stripos($value, (string) $key) !== false) {
+                return $translated;
+            }
+        }
+
+        return $value;
+    }
+
+    private function mapEmbroideryPosition($value)
+    {
+        $value = (string) $value;
+
+        if (stripos($value, 'Middle') !== false) {
+            return '胸部中央';
+        }
+
+        if (stripos($value, 'Left') !== false) {
+            return '左胸口';
+        }
+
+        if (stripos($value, 'Right') !== false) {
+            return '右胸口';
+        }
+
+        return trim($value);
     }
 
     private function loadSourceExcel($sourceFilePath)
