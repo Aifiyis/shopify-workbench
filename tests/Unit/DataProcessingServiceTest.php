@@ -72,7 +72,7 @@ class DataProcessingServiceTest extends TestCase
             'Red' => '红色',
         ]);
 
-        $this->assertEquals("第一行：California\n第二行：2026", $result[19]);
+        $this->assertEquals("第一行：California\n第二行：EST. 2026", $result[19]);
         $this->assertEquals('红色', $result[21]);
         $this->assertEquals('胸部中央', $result[26]);
     }
@@ -96,6 +96,40 @@ class DataProcessingServiceTest extends TestCase
         $this->assertEquals('全彩', $result[20]);
         $this->assertEquals('https://example.test/photo.png', $result[22]);
         $this->assertEquals('胸部中央', $result[26]);
+    }
+
+    public function test_format_ctcx_est_year_line()
+    {
+        $method = $this->getDataProcessingMethod('formatCtcxEstYearLine');
+
+        $this->assertEquals('第二行：EST. 1990', $method->invoke($this->dataProcessingService, '1990'));
+        $this->assertEquals('第二行：EST. 1990', $method->invoke($this->dataProcessingService, 'EST.1990'));
+        $this->assertEquals('第二行：EST. 1990', $method->invoke($this->dataProcessingService, 'Est 1990'));
+        $this->assertEquals('第二行：EST. 1990-1992', $method->invoke($this->dataProcessingService, 'Est 1990-1992'));
+    }
+
+    public function test_map_embroidery_position()
+    {
+        $method = $this->getDataProcessingMethod('mapEmbroideryPosition');
+
+        $this->assertEquals('胸部中央', $method->invoke($this->dataProcessingService, 'Middle Chest'));
+        $this->assertEquals('胸部中央', $method->invoke($this->dataProcessingService, 'middle chest'));
+        $this->assertEquals('胸部中央', $method->invoke($this->dataProcessingService, 'Center Chest'));
+        $this->assertEquals('左胸口', $method->invoke($this->dataProcessingService, 'left chest'));
+        $this->assertEquals('右胸口', $method->invoke($this->dataProcessingService, 'Right Chest'));
+    }
+
+    public function test_get_cell_value_falls_back_for_dispimg_formula()
+    {
+        $spreadsheet = new \PHPExcel();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('order_1');
+        $sheet->setCellValue('N2', '=_xlfn.DISPIMG("ID_TEST_IMAGE",1)');
+
+        $method = $this->getDataProcessingMethod('getCellValue');
+        $value = $method->invoke($this->dataProcessingService, $sheet, 13, 2);
+
+        $this->assertSame('', $value);
     }
 
     private function getDataProcessingMethod($name)

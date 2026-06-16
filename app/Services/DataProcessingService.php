@@ -147,6 +147,7 @@ class DataProcessingService
                     continue;
                 }
 
+                // style和color从private\lookups\color_lookup.json和style_lookup.json中匹配
                 $style = $this->lookupService->matchStyle($sku, $styleLookup);
                 $color = $this->lookupService->matchColor($productSpecs, $colorLookup);
                 $size = $this->lookupService->extractSize($productSpecs);
@@ -226,15 +227,17 @@ class DataProcessingService
             $chestTextLines = [];
 
             foreach ($attributes as $attribute) {
-                if (stripos($attribute['name'], 'State Options') !== false) {
+                $name = strtolower($attribute['name']);
+
+                if (stripos($name, 'state options') !== false) {
                     $chestTextLines[] = '第一行：' . $attribute['value'];
                 }
 
-                if (stripos($attribute['name'], 'Year') !== false) {
-                    $chestTextLines[] = '第二行：' . $attribute['value'];
+                if (stripos($name, 'year') !== false) {
+                    $chestTextLines[] = '第二行：EST. ' . $this->formatCtcxEstYearLine($attribute['value']);
                 }
 
-                if (stripos($attribute['name'], 'Text Thread Color') !== false) {
+                if (stripos($name, 'thread color') !== false) {
                     $values[21] = $this->translateLookupValue($attribute['value'], $colorLookup);
                 }
             }
@@ -250,21 +253,34 @@ class DataProcessingService
             $values[20] = '全彩';
 
             foreach ($attributes as $attribute) {
-                if (stripos($attribute['name'], 'Thread Color') !== false) {
+                $name = strtolower($attribute['name']);
+
+                if (stripos($name, 'thread color') !== false) {
                     $values[17] = $attribute['value'];
                 }
 
-                if (stripos($attribute['name'], 'Embroidery Position') !== false) {
+                if (strpos($name, 'embroidery') !== false && (strpos($name, 'position') !== false) || (strpos($name, 'placement') !== false)) {
                     $values[26] = $this->mapEmbroideryPosition($attribute['value']);
                 }
 
-                if (stripos($attribute['name'], 'Photo') !== false) {
+                if (stripos($name, 'photo') !== false) {
                     $values[22] = $attribute['value'];
                 }
             }
         }
-
         return $values;
+    }
+
+    private function formatCtcxEstYearLine(string $yearValue): string
+    {
+        $yearPart = trim($yearValue);
+
+        if (preg_match('/est/i', $yearPart)) {
+            $yearPart = preg_replace('/^\s*est\.?\s*/i', '', $yearPart);
+            $yearPart = trim($yearPart);
+        }
+
+        return $yearPart;
     }
 
     private function parseOrderedAttributesAfter($specs, $skipCount)
@@ -322,21 +338,24 @@ class DataProcessingService
 
     private function mapEmbroideryPosition($value)
     {
-        $value = (string) $value;
+        $value = trim((string) $value);
+        $lowerValue = strtolower($value);
 
-        if (stripos($value, 'Middle') !== false) {
+        if (strpos($lowerValue, 'middle') !== false
+            || strpos($lowerValue, 'center') !== false
+            || strpos($lowerValue, 'centre') !== false) {
             return '胸部中央';
         }
 
-        if (stripos($value, 'Left') !== false) {
+        if (strpos($lowerValue, 'left') !== false) {
             return '左胸口';
         }
 
-        if (stripos($value, 'Right') !== false) {
+        if (strpos($lowerValue, 'right') !== false) {
             return '右胸口';
         }
 
-        return trim($value);
+        return $value;
     }
 
     private function loadSourceExcel($sourceFilePath)
@@ -550,7 +569,50 @@ class DataProcessingService
             return null;
         }
 
-        return $sheet->getCellByColumnAndRow($column, $row)->getCalculatedValue();
+        $cell = $sheet->getCellByColumnAndRow($column, $row);
+
+        try {
+            return $cell->getCalculatedValue();
+        } catch (\Exception $e) {
+            \Log::warning('Falling back to raw Excel cell value after formula calculation failed.', [
+                'sheet' => $sheet->getTitle(),
+                'cell' => PHPExcel_Cell::stringFromColumnIndex($column) . $row,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $this->getFormulaFallbackValue($cell);
+        }
+    }
+
+    private function getFormulaFallbackValue($cell)
+    {
+        $oldValue = method_exists($cell, 'getOldCalculatedValue') ? $cell->getOldCalculatedValue() : null;
+
+        if (!$this->isBlank($oldValue) && !$this->looksLikeFormula($oldValue)) {
+            return $oldValue;
+        }
+
+        $rawValue = $cell->getValue();
+
+        if ($this->isDispimgFormula($rawValue) || $this->isDispimgFormula($oldValue)) {
+            return '';
+        }
+
+        if (!$this->looksLikeFormula($rawValue)) {
+            return $rawValue;
+        }
+
+        return '';
+    }
+
+    private function looksLikeFormula($value)
+    {
+        return is_string($value) && strpos(trim($value), '=') === 0;
+    }
+
+    private function isDispimgFormula($value)
+    {
+        return is_string($value) && stripos($value, 'DISPIMG(') !== false;
     }
 
     private function isSourceRowBlank($sheet, $row, $columnCount)
@@ -729,11 +791,161 @@ class DataProcessingService
                     }
                 }
             }
+
+            $cellImagePathsById = $this->getCellImagePathsById($zip, $result);
+
+            if (!empty($cellImagePathsById)) {
+                $this->appendDispimgImagesByRow($sourceFilePath, $cellImagePathsById, $result);
+            }
         } finally {
             $zip->close();
         }
 
         return $result;
+    }
+
+    private function getCellImagePathsById(ZipArchive $zip, array &$result)
+    {
+        $cellImagesXml = $zip->getFromName('xl/cellimages.xml');
+
+        if ($cellImagesXml === false) {
+            return [];
+        }
+
+        $relationships = $this->getCellImageRelationships($zip);
+
+        if (empty($relationships)) {
+            return [];
+        }
+
+        $cellImages = simplexml_load_string($cellImagesXml);
+
+        if ($cellImages === false) {
+            return [];
+        }
+
+        $cellImages->registerXPathNamespace('xdr', 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing');
+        $cellImages->registerXPathNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+        $pictures = $cellImages->xpath('//xdr:pic') ?: [];
+        $pathsById = [];
+        $mediaCache = [];
+
+        foreach ($pictures as $picture) {
+            $picture->registerXPathNamespace('xdr', 'http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing');
+            $picture->registerXPathNamespace('a', 'http://schemas.openxmlformats.org/drawingml/2006/main');
+
+            $nameNodes = $picture->xpath('xdr:nvPicPr/xdr:cNvPr') ?: [];
+            $blipNodes = $picture->xpath('xdr:blipFill/a:blip') ?: [];
+
+            if (empty($nameNodes) || empty($blipNodes)) {
+                continue;
+            }
+
+            $imageId = (string) ($nameNodes[0]['name'] ?? '');
+            $attributes = $blipNodes[0]->attributes('http://schemas.openxmlformats.org/officeDocument/2006/relationships');
+            $relationshipId = (string) ($attributes['embed'] ?? '');
+
+            if ($imageId === '' || $relationshipId === '' || !isset($relationships[$relationshipId])) {
+                continue;
+            }
+
+            $mediaPath = $relationships[$relationshipId];
+
+            if (!isset($mediaCache[$mediaPath])) {
+                $bytes = $zip->getFromName($mediaPath);
+
+                if ($bytes === false) {
+                    continue;
+                }
+
+                $extension = pathinfo($mediaPath, PATHINFO_EXTENSION) ?: 'image';
+                $directory = storage_path('app/temp/source_images');
+                $this->ensureDirectory($directory);
+                $tempPath = $directory . DIRECTORY_SEPARATOR . uniqid('source_cell_', true) . '.' . $extension;
+                file_put_contents($tempPath, $bytes);
+
+                $mediaCache[$mediaPath] = $tempPath;
+                $result['paths'][] = $tempPath;
+            }
+
+            $pathsById[$imageId] = $mediaCache[$mediaPath];
+        }
+
+        return $pathsById;
+    }
+
+    private function getCellImageRelationships(ZipArchive $zip)
+    {
+        $relationshipsXml = $zip->getFromName('xl/_rels/cellimages.xml.rels');
+
+        if ($relationshipsXml === false) {
+            return [];
+        }
+
+        $relationshipsNode = simplexml_load_string($relationshipsXml);
+
+        if ($relationshipsNode === false) {
+            return [];
+        }
+
+        $relationshipsNode->registerXPathNamespace('rel', 'http://schemas.openxmlformats.org/package/2006/relationships');
+        $relationships = [];
+
+        foreach ($relationshipsNode->xpath('//rel:Relationship') ?: [] as $relationship) {
+            $id = (string) $relationship['Id'];
+            $target = (string) $relationship['Target'];
+
+            if ($id === '' || $target === '') {
+                continue;
+            }
+
+            $relationships[$id] = $this->normalizeZipPath('xl', $target);
+        }
+
+        return $relationships;
+    }
+
+    private function appendDispimgImagesByRow($sourceFilePath, array $cellImagePathsById, array &$result)
+    {
+        try {
+            $sourceExcel = $this->loadSourceExcel($sourceFilePath);
+            $sourceSheet = $sourceExcel->getActiveSheet();
+            $highestRow = $sourceSheet->getHighestRow();
+            $highestColumn = $sourceSheet->getHighestColumn();
+            $columnCount = PHPExcel_Cell::columnIndexFromString($highestColumn);
+
+            for ($row = 1; $row <= $highestRow; $row++) {
+                for ($column = 0; $column < $columnCount; $column++) {
+                    $cell = $sourceSheet->getCellByColumnAndRow($column, $row);
+                    $imageId = $this->extractDispimgImageId($cell->getValue());
+
+                    if ($imageId === null && method_exists($cell, 'getOldCalculatedValue')) {
+                        $imageId = $this->extractDispimgImageId($cell->getOldCalculatedValue());
+                    }
+
+                    if ($imageId === null || !isset($cellImagePathsById[$imageId]) || isset($result['by_row'][$row])) {
+                        continue;
+                    }
+
+                    $result['by_row'][$row] = $cellImagePathsById[$imageId];
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Failed to read DISPIMG cell images from source workbook: ' . $e->getMessage());
+        }
+    }
+
+    private function extractDispimgImageId($value)
+    {
+        if (!is_string($value) || stripos($value, 'DISPIMG(') === false) {
+            return null;
+        }
+
+        if (preg_match('/DISPIMG\(\s*"([^"]+)"/i', $value, $matches)) {
+            return $matches[1];
+        }
+
+        return null;
     }
 
     private function getDrawingRelationships(ZipArchive $zip, $drawingPath)
@@ -1033,6 +1245,8 @@ class DataProcessingService
             '贺卡',
             '礼品袋',
             '设计稿',
+            'sku',
+            '产品规格'
         ];
     }
 
