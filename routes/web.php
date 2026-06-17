@@ -34,6 +34,16 @@ Route::middleware('auth:admin')->group(function () {
     Route::prefix('data-processing')->name('data-processing.')->group(function () {
         Route::get('/', [App\Http\Controllers\DataProcessingController::class, 'index'])->name('index');
         Route::post('/upload', [App\Http\Controllers\DataProcessingController::class, 'upload'])->name('upload');
+        Route::get('/upload', function (\Illuminate\Http\Request $request) {
+            \Log::warning('Data processing upload URL was opened with GET.', [
+                'referer' => $request->headers->get('referer'),
+                'previous_url' => url()->previous(),
+                'query' => $request->query(),
+            ]);
+
+            return redirect()->route('data-processing.index')
+                ->with('error', 'The upload URL was opened with GET. Please upload from the Data Processing page using Process File.');
+        })->name('upload.redirect');
         Route::get('/{id}/download', [App\Http\Controllers\DataProcessingController::class, 'download'])->name('download');
         Route::delete('/{id}', [App\Http\Controllers\DataProcessingController::class, 'delete'])->name('delete');
     });

@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProcessedFile;
-use App\Services\DataProcessingService;
+use App\Services\DataProcessingUploadDispatcher;
 use App\Services\FileExpirationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -11,16 +11,16 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class DataProcessingController extends Controller
 {
-    private $dataProcessingService;
     private $fileExpirationService;
+    private $dataProcessingUploadDispatcher;
 
     public function __construct(
-        DataProcessingService $dataProcessingService,
-        FileExpirationService $fileExpirationService
+        FileExpirationService $fileExpirationService,
+        DataProcessingUploadDispatcher $dataProcessingUploadDispatcher
     ) {
         $this->middleware('auth:admin');
-        $this->dataProcessingService = $dataProcessingService;
         $this->fileExpirationService = $fileExpirationService;
+        $this->dataProcessingUploadDispatcher = $dataProcessingUploadDispatcher;
     }
 
     public function index(Request $request)
@@ -47,8 +47,30 @@ class DataProcessingController extends Controller
 
     public function upload(Request $request)
     {
+        \Log::info('Data processing upload request received.', [
+            'method' => $request->method(),
+            'path' => $request->path(),
+            'content_length' => $request->server('CONTENT_LENGTH'),
+            'content_type' => $request->server('CONTENT_TYPE'),
+            'has_file' => $request->hasFile('file'),
+            'file_error' => isset($_FILES['file']) ? ($_FILES['file']['error'] ?? null) : null,
+            'file_name' => isset($_FILES['file']) ? ($_FILES['file']['name'] ?? null) : null,
+        ]);
+
+        if (!$request->hasFile('file')) {
+            \Log::warning('Data processing upload reached controller without an uploaded file.', [
+                'content_length' => $request->server('CONTENT_LENGTH'),
+                'post_max_size' => ini_get('post_max_size'),
+                'upload_max_filesize' => ini_get('upload_max_filesize'),
+                'files' => $_FILES,
+            ]);
+
+            return redirect()->route('data-processing.index')
+                ->with('error', 'No uploaded file was received by PHP. Please reselect the file and upload again; if it repeats, the file may exceed the web PHP upload limit.');
+        }
+
         $request->validate([
-            'file' => 'required|file',
+            'file' => 'file',
         ]);
 
         $extension = strtolower($request->file('file')->getClientOriginalExtension());
@@ -60,41 +82,39 @@ class DataProcessingController extends Controller
 
         $admin = Auth::guard('admin')->user();
 
+        $processedFile = null;
+
         try {
             $file = $request->file('file');
             $originalName = $file->getClientOriginalName();
             $safeTempName = uniqid('upload_', true) . '.' . $extension;
 
-            // Store uploaded file temporarily
+            // Store uploaded file temporarily, then process it outside the web request.
             $tempPath = $file->storeAs('temp', $safeTempName, 'local');
             $fullTempPath = storage_path('app/' . $tempPath);
 
-            // Process the file
-            $result = $this->dataProcessingService->processOrderFileAll($fullTempPath, $originalName);
-
-            if (!$result['success']) {
-                @unlink($fullTempPath);
-                return redirect()->back()
-                    ->with('error', 'Processing failed: ' . $result['error']);
-            }
-
-            // Record processed file in database
             $processedFile = ProcessedFile::create([
                 'admin_id' => $admin->id,
                 'original_filename' => $originalName,
-                'processed_filename' => $result['output_filename'],
-                'file_path' => $result['output_path'],
-                'status' => 'completed',
+                'processed_filename' => 'processing_' . pathinfo($safeTempName, PATHINFO_FILENAME) . '.zip',
+                'file_path' => $fullTempPath,
+                'status' => 'processing',
                 'uploaded_at' => now(),
                 'expires_at' => now()->addHour(),
             ]);
 
-            // Clean up temp file
-            @unlink($fullTempPath);
+            $this->dataProcessingUploadDispatcher->dispatch($processedFile->id);
 
             return redirect()->route('data-processing.index')
-                ->with('success', "File processed successfully! {$result['rows_processed']} rows processed, {$result['ctcx_rows_processed']} CTCX rows exported.");
+                ->with('success', 'File uploaded successfully. Processing has started; refresh this page in a moment to download the order excel exported zip.');
         } catch (\Exception $e) {
+            if ($processedFile) {
+                $processedFile->update([
+                    'status' => 'failed',
+                    'error_message' => $e->getMessage(),
+                ]);
+            }
+
             \Log::error('File upload processing failed: ' . $e->getMessage());
             return redirect()->back()
                 ->with('error', 'An error occurred while processing the file: ' . $e->getMessage());
@@ -107,6 +127,10 @@ class DataProcessingController extends Controller
         $processedFile = ProcessedFile::where('id', $id)
             ->where('admin_id', $admin->id)
             ->firstOrFail();
+
+        if ($processedFile->status !== 'completed') {
+            abort(409, 'File is not ready for download');
+        }
 
         // Check if file is expired
         if ($processedFile->isExpired()) {

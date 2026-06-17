@@ -70,6 +70,7 @@
                     <thead>
                         <tr class="bg-gray-100">
                             <th class="border border-gray-300 px-4 py-2 text-left">File Name</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
                             <th class="border border-gray-300 px-4 py-2 text-left">Uploaded</th>
                             <th class="border border-gray-300 px-4 py-2 text-left">Expires</th>
                             <th class="border border-gray-300 px-4 py-2 text-center">Actions</th>
@@ -81,6 +82,18 @@
                                 <td class="border border-gray-300 px-4 py-2">
                                     <div class="font-semibold">{{ $file->processed_filename }}</div>
                                     <div class="text-sm text-gray-600">{{ $file->original_filename }}</div>
+                                </td>
+                                <td class="border border-gray-300 px-4 py-2 text-sm">
+                                    @if($file->status === 'processing')
+                                        <span class="text-orange-600 font-bold">Processing</span>
+                                    @elseif($file->status === 'failed')
+                                        <span class="text-red-600 font-bold">Failed</span>
+                                        @if($file->error_message)
+                                            <div class="text-xs text-red-600 mt-1">{{ $file->error_message }}</div>
+                                        @endif
+                                    @else
+                                        <span class="text-green-600 font-bold">Completed</span>
+                                    @endif
                                 </td>
                                 <td class="border border-gray-300 px-4 py-2 text-sm">
                                     {{ $file->uploaded_at->format('Y-m-d H:i') }}
@@ -98,11 +111,13 @@
                                     @endif
                                 </td>
                                 <td class="border border-gray-300 px-4 py-2 text-center">
-                                    @if(!$file->expiry_info['is_expired'])
+                                    @if($file->status === 'completed' && !$file->expiry_info['is_expired'])
                                         <a href="{{ route('data-processing.download', $file->id) }}"
                                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm inline-block mr-2">
                                             Download All
                                         </a>
+                                    @elseif($file->status === 'processing')
+                                        <span class="text-sm text-gray-600 inline-block mr-2">Processing...</span>
                                     @endif
 
                                     <form method="POST" action="{{ route('data-processing.delete', $file->id) }}"
@@ -130,6 +145,12 @@
 </div>
 
 <script>
+@if($processedFiles->contains(function ($file) { return $file->status === 'processing'; }))
+setTimeout(function () {
+    window.location.reload();
+}, 10000);
+@endif
+
 function updateFileName(input) {
     const fileName = document.getElementById('fileName');
     const chooseFileButton = document.getElementById('chooseFileButton');

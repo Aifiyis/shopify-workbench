@@ -88,6 +88,10 @@ class SkuCleaningService
             'cleaned_sku' => $cleanedSku,
             'excel_category' => $category,
             'type' => $category,
+            '中文名称' => $category,
+            '工艺' => is_array($row) ? (string) ($row['工艺'] ?? '') : '',
+            '处理人' => is_array($row) ? (string) ($row['处理人'] ?? '') : '',
+            '上品人' => is_array($row) ? (string) ($row['上品人'] ?? '') : '',
         ];
     }
 

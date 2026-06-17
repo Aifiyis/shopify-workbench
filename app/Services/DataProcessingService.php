@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\OrderExportTemplates\OrderExportTemplateRegistry;
 use PHPExcel;
 use PHPExcel_Cell;
 use PHPExcel_IOFactory;
@@ -11,10 +12,21 @@ use ZipArchive;
 class DataProcessingService
 {
     private $lookupService;
+    private $skuCleaningService;
+    private $templateRegistry;
+    private $skuOptionImageResolver;
 
-    public function __construct(LookupService $lookupService)
+    public function __construct(
+        LookupService $lookupService,
+        SkuCleaningService $skuCleaningService = null,
+        OrderExportTemplateRegistry $templateRegistry = null,
+        SkuOptionImageResolver $skuOptionImageResolver = null
+    )
     {
         $this->lookupService = $lookupService;
+        $this->skuCleaningService = $skuCleaningService ?: new SkuCleaningService();
+        $this->templateRegistry = $templateRegistry ?: OrderExportTemplateRegistry::default();
+        $this->skuOptionImageResolver = $skuOptionImageResolver ?: new SkuOptionImageResolver();
     }
 
     public function processOrderFileAll($sourceFilePath, $sourceFilename = null)
@@ -34,7 +46,8 @@ class DataProcessingService
             $sourceSheet = $sourceExcel->getActiveSheet();
             $sourceFilename = $sourceFilename ?: basename($sourceFilePath);
             $filenameKey = $this->extractFilenameKey($sourceFilename);
-            $skuLookup = $this->getSkuProductTypeLookup();
+            $styleLookup = $this->lookupService->getStyleLookup();
+            $colorLookup = $this->lookupService->getColorLookup();
             $sourceColumns = $this->getSourceColumnIndices($sourceSheet, 1);
 
             if ($sourceColumns['sku'] === null) {
@@ -43,27 +56,32 @@ class DataProcessingService
 
             $allResult = $this->buildAllOrderFile(
                 $sourceSheet,
-                $sourceColumns['sku'],
-                $sourceColumns['picture'],
-                $skuLookup,
+                $sourceColumns,
+                $styleLookup,
+                $colorLookup,
                 $filenameKey,
                 $sourceFilename,
                 $embeddedImages['by_row']
             );
 
             $outputFiles = [$allResult['file']];
-            $ctcxRows = $allResult['ctcx_rows'];
+            $templateGroups = $allResult['template_groups'];
 
-            if (!empty($ctcxRows)) {
-                $ctcxResult = $this->processOrderFileCTCX($sourceFilePath, $ctcxRows, $sourceFilename, $embeddedImages['by_row']);
-
-                if (!$ctcxResult['success']) {
-                    return $ctcxResult;
-                }
+            foreach ($templateGroups as $group) {
+                $templateFile = $this->processTemplateOrderFile(
+                    $sourceFilename,
+                    $group['template'],
+                    $group['rows'],
+                    $embeddedImages['by_row'],
+                    [
+                        'color_lookup' => $colorLookup,
+                        'sku_option_image_resolver' => $this->skuOptionImageResolver,
+                    ]
+                );
 
                 $outputFiles[] = [
-                    'filename' => $ctcxResult['output_filename'],
-                    'path' => $ctcxResult['output_path'],
+                    'filename' => $templateFile['filename'],
+                    'path' => $templateFile['path'],
                 ];
             }
 
@@ -75,7 +93,10 @@ class DataProcessingService
                 'output_filename' => $archive['filename'],
                 'output_path' => $archive['path'],
                 'rows_processed' => $allResult['rows_processed'],
-                'ctcx_rows_processed' => count($ctcxRows),
+                'template_rows_processed' => array_sum(array_map(function ($group) {
+                    return count($group['rows']);
+                }, $templateGroups)),
+                'ctcx_rows_processed' => isset($templateGroups['ctcx']) ? count($templateGroups['ctcx']['rows']) : 0,
                 'files' => array_column($outputFiles, 'filename'),
             ];
         } catch (\Exception $e) {
@@ -87,6 +108,59 @@ class DataProcessingService
                 'error' => $e->getMessage(),
             ];
         }
+    }
+
+    private function processTemplateOrderFile($sourceFilename, $template, array $rows, array $embeddedImagesByRow, array $context)
+    {
+        $outputSpreadsheet = new PHPExcel();
+        $outputSheet = $outputSpreadsheet->getActiveSheet();
+        $headers = $template->headers();
+        $imageTempFiles = [
+            'paths' => [],
+            'cache' => [],
+        ];
+
+        foreach ($headers as $index => $header) {
+            $outputSheet->setCellValueByColumnAndRow($index, 1, $header);
+        }
+
+        $outputRow = 2;
+
+        foreach ($rows as $row) {
+            $values = $template->mapRow($row, $context);
+
+            for ($column = 0; $column < count($headers); $column++) {
+                $this->setTemplateCellValue(
+                    $outputSheet,
+                    $headers,
+                    $column,
+                    $outputRow,
+                    $values[$column] ?? '',
+                    $imageTempFiles,
+                    $column === 2 ? ($embeddedImagesByRow[$row['source_row']] ?? null) : null
+                );
+            }
+
+            $outputRow++;
+        }
+
+        $this->adjustColumnWidths($outputSheet, count($headers));
+        $this->adjustImageColumns($outputSheet, $headers);
+        $this->adjustReviewColumns($outputSheet, $headers);
+
+        $outputFilename = $this->generateTemplateOutputFilename($template->label(), $sourceFilename);
+        $outputPath = $this->getIntermediateFilePath($outputFilename);
+        $this->ensureDirectory(dirname($outputPath));
+
+        $writer = new PHPExcel_Writer_Excel2007($outputSpreadsheet);
+        $writer->save($outputPath);
+        $this->cleanupTempFiles($imageTempFiles);
+
+        return [
+            'filename' => $outputFilename,
+            'path' => $outputPath,
+            'rows_processed' => $outputRow - 2,
+        ];
     }
 
     /**
@@ -116,7 +190,8 @@ class DataProcessingService
             $colorLookup = $this->lookupService->getColorLookup();
             $outputSpreadsheet = new PHPExcel();
             $outputSheet = $outputSpreadsheet->getActiveSheet();
-            $headers = $this->getCtcxHeaders();
+            $template = $this->templateRegistry->forChineseName('彩图刺绣');
+            $headers = $template->headers();
             $imageTempFiles = [
                 'paths' => [],
                 'cache' => [],
@@ -151,40 +226,44 @@ class DataProcessingService
                 $style = $this->lookupService->matchStyle($sku, $styleLookup);
                 $color = $this->lookupService->matchColor($productSpecs, $colorLookup);
                 $size = $this->lookupService->extractSize($productSpecs);
+                $resolvedSku = $this->skuCleaningService->resolve($sku);
 
-                $values = [
-                    $filenameKey,
-                    $orderId,
-                    $productImage ?? '',
-                    '',
-                    $style ?? '',
-                    $color ?? '',
-                    $size ?? '',
-                    $quantity ?? '',
-                ];
-
-                $values = $this->applyCtcxSkuRules($values, $sku, $productSpecs, $colorLookup);
+                $values = $template->mapRow([
+                    'filename_key' => $filenameKey,
+                    'source_row' => $row,
+                    'order_id' => $orderId,
+                    'sku' => $sku,
+                    'cleaned_sku' => $resolvedSku['cleaned_sku'] ?? '',
+                    'chinese_name' => '彩图刺绣',
+                    'product_specs' => $productSpecs,
+                    'product_image' => $productImage ?? '',
+                    'quantity' => $quantity ?? '',
+                    'style' => $style ?? '',
+                    'color' => $color ?? '',
+                    'size' => $size ?? '',
+                ], [
+                    'color_lookup' => $colorLookup,
+                    'sku_option_image_resolver' => $this->skuOptionImageResolver,
+                ]);
 
                 for ($column = 0; $column < count($headers); $column++) {
-                    if ($column === 2) {
-                        $this->setCellValueOrImage($outputSheet, $column, $outputRow, $values[$column] ?? '', $imageTempFiles, $embeddedImages['by_row'][$row] ?? null);
-                        continue;
-                    }
-
-                    $outputSheet->setCellValueByColumnAndRow($column, $outputRow, $values[$column] ?? '');
-
-                    if ($column === 19 && !empty($values[$column])) {
-                        $outputSheet->getStyleByColumnAndRow($column, $outputRow)
-                            ->getAlignment()
-                            ->setWrapText(true);
-                    }
+                    $this->setTemplateCellValue(
+                        $outputSheet,
+                        $headers,
+                        $column,
+                        $outputRow,
+                        $values[$column] ?? '',
+                        $imageTempFiles,
+                        $column === 2 ? ($embeddedImages['by_row'][$row] ?? null) : null
+                    );
                 }
 
                 $outputRow++;
             }
 
             $this->adjustColumnWidths($outputSheet, count($headers));
-            $outputSheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex(2))->setWidth(18);
+            $this->adjustImageColumns($outputSheet, $headers);
+            $this->adjustReviewColumns($outputSheet, $headers);
 
             $outputFilename = $this->generateCtcxOutputFilename($sourceFilename);
             $outputPath = $this->getIntermediateFilePath($outputFilename);
@@ -218,146 +297,6 @@ class DataProcessingService
         return $this->processOrderFileCTCX($sourceFilePath);
     }
 
-    private function applyCtcxSkuRules(array $values, $sku, $productSpecs, array $colorLookup)
-    {
-        $sku = (string) $sku;
-        $attributes = $this->parseOrderedAttributesAfter($productSpecs, 3);
-
-        if (strpos($sku, 'CS-QK0743-CX') !== false) {
-            $chestTextLines = [];
-
-            foreach ($attributes as $attribute) {
-                $name = strtolower($attribute['name']);
-
-                if (stripos($name, 'state options') !== false) {
-                    $chestTextLines[] = '第一行：' . $attribute['value'];
-                }
-
-                if (stripos($name, 'year') !== false) {
-                    $chestTextLines[] = '第二行：EST. ' . $this->formatCtcxEstYearLine($attribute['value']);
-                }
-
-                if (stripos($name, 'thread color') !== false) {
-                    $values[21] = $this->translateLookupValue($attribute['value'], $colorLookup);
-                }
-            }
-
-            if (!empty($chestTextLines)) {
-                $values[19] = implode("\n", $chestTextLines);
-            }
-
-            $values[26] = '胸部中央';
-        }
-
-        if (strpos($sku, 'CS-QK2571-CX') !== false) {
-            $values[20] = '全彩';
-
-            foreach ($attributes as $attribute) {
-                $name = strtolower($attribute['name']);
-
-                if (stripos($name, 'thread color') !== false) {
-                    $values[17] = $attribute['value'];
-                }
-
-                if (strpos($name, 'embroidery') !== false && (strpos($name, 'position') !== false) || (strpos($name, 'placement') !== false)) {
-                    $values[26] = $this->mapEmbroideryPosition($attribute['value']);
-                }
-
-                if (stripos($name, 'photo') !== false) {
-                    $values[22] = $attribute['value'];
-                }
-            }
-        }
-        return $values;
-    }
-
-    private function formatCtcxEstYearLine(string $yearValue): string
-    {
-        $yearPart = trim($yearValue);
-
-        if (preg_match('/est/i', $yearPart)) {
-            $yearPart = preg_replace('/^\s*est\.?\s*/i', '', $yearPart);
-            $yearPart = trim($yearPart);
-        }
-
-        return $yearPart;
-    }
-
-    private function parseOrderedAttributesAfter($specs, $skipCount)
-    {
-        if (empty($specs)) {
-            return [];
-        }
-
-        $attributes = [];
-        $lines = preg_split('/\r\n|\n|\r/', trim((string) $specs));
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if ($line === '' || strpos($line, ':') === false) {
-                continue;
-            }
-
-            list($name, $value) = explode(':', $line, 2);
-            $attributes[] = [
-                'name' => trim($name),
-                'value' => trim($value),
-            ];
-        }
-
-        return array_slice($attributes, $skipCount);
-    }
-
-    private function translateLookupValue($value, array $lookup)
-    {
-        $value = trim((string) $value);
-
-        if ($value === '') {
-            return '';
-        }
-
-        if (isset($lookup[$value])) {
-            return $lookup[$value];
-        }
-
-        foreach ($lookup as $key => $translated) {
-            if (strcasecmp($value, (string) $key) === 0) {
-                return $translated;
-            }
-        }
-
-        foreach ($lookup as $key => $translated) {
-            if ($key !== '' && stripos($value, (string) $key) !== false) {
-                return $translated;
-            }
-        }
-
-        return $value;
-    }
-
-    private function mapEmbroideryPosition($value)
-    {
-        $value = trim((string) $value);
-        $lowerValue = strtolower($value);
-
-        if (strpos($lowerValue, 'middle') !== false
-            || strpos($lowerValue, 'center') !== false
-            || strpos($lowerValue, 'centre') !== false) {
-            return '胸部中央';
-        }
-
-        if (strpos($lowerValue, 'left') !== false) {
-            return '左胸口';
-        }
-
-        if (strpos($lowerValue, 'right') !== false) {
-            return '右胸口';
-        }
-
-        return $value;
-    }
-
     private function loadSourceExcel($sourceFilePath)
     {
         $reader = PHPExcel_IOFactory::createReaderForFile($sourceFilePath);
@@ -369,7 +308,7 @@ class DataProcessingService
         return $reader->load($sourceFilePath);
     }
 
-    private function buildAllOrderFile($sourceSheet, $skuColumn, $pictureColumn, array $skuLookup, $filenameKey, $sourceFilename, array $embeddedImagesByRow = [])
+    private function buildAllOrderFile($sourceSheet, array $sourceColumns, array $styleLookup, array $colorLookup, $filenameKey, $sourceFilename, array $embeddedImagesByRow = [])
     {
         $outputSpreadsheet = new PHPExcel();
         $outputSheet = $outputSpreadsheet->getActiveSheet();
@@ -377,11 +316,14 @@ class DataProcessingService
         $sourceColumnCount = $this->getSourceDataColumnCount($sourceSheet, 1);
         $appendStartColumn = $sourceColumnCount + 1;
         $ctcxRows = [];
+        $templateCandidateRows = [];
         $rowsProcessed = 0;
         $imageTempFiles = [
             'paths' => [],
             'cache' => [],
         ];
+        $skuColumn = $sourceColumns['sku'];
+        $pictureColumn = $sourceColumns['picture'];
 
         $outputSheet->setCellValueByColumnAndRow(0, 1, '导表日期');
 
@@ -405,8 +347,11 @@ class DataProcessingService
             }
 
             $sku = $this->normalizeLookupKey($this->getCellValue($sourceSheet, $skuColumn, $row));
-            $skuInfo = $skuLookup[$sku] ?? [];
-            $chineseName = $skuInfo['中文名称'] ?? '';
+            $resolvedSku = $this->skuCleaningService->resolve($sku);
+            $chineseName = $resolvedSku['excel_category'] ?? '';
+            $productSpecs = $this->getCellValue($sourceSheet, $sourceColumns['specs'], $row);
+            $productImage = $this->getCellValue($sourceSheet, $pictureColumn, $row);
+            $quantity = $this->getCellValue($sourceSheet, $sourceColumns['quantity'], $row);
 
             $outputSheet->setCellValueByColumnAndRow(0, $outputRow, $filenameKey);
 
@@ -422,9 +367,24 @@ class DataProcessingService
             }
 
             $outputSheet->setCellValueByColumnAndRow($appendStartColumn, $outputRow, $chineseName);
-            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 1, $outputRow, $skuInfo['工艺'] ?? '');
-            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 2, $outputRow, $skuInfo['处理人'] ?? '');
-            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 3, $outputRow, $skuInfo['上品人'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 1, $outputRow, $resolvedSku['工艺'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 2, $outputRow, $resolvedSku['处理人'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 3, $outputRow, $resolvedSku['上品人'] ?? '');
+
+            $templateCandidateRows[] = [
+                'filename_key' => $filenameKey,
+                'source_row' => $row,
+                'order_id' => $this->getCellValue($sourceSheet, $sourceColumns['order_id'], $row),
+                'sku' => $sku,
+                'cleaned_sku' => $resolvedSku['cleaned_sku'] ?? '',
+                'chinese_name' => $chineseName,
+                'product_specs' => $productSpecs,
+                'product_image' => $productImage,
+                'quantity' => $quantity,
+                'style' => $this->lookupService->matchStyle($sku, $styleLookup) ?? '',
+                'color' => $this->lookupService->matchColor($productSpecs, $colorLookup) ?? '',
+                'size' => $this->lookupService->extractSize($productSpecs) ?? '',
+            ];
 
             if ($chineseName === '彩图刺绣') {
                 $ctcxRows[] = $row;
@@ -455,7 +415,34 @@ class DataProcessingService
             ],
             'rows_processed' => $rowsProcessed,
             'ctcx_rows' => $ctcxRows,
+            'template_groups' => $this->groupRowsByTemplate($templateCandidateRows),
         ];
+    }
+
+    private function groupRowsByTemplate(array $rows)
+    {
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $template = $this->templateRegistry->forChineseName($row['chinese_name'] ?? '');
+
+            if ($template === null) {
+                continue;
+            }
+
+            $key = $template->key();
+
+            if (!isset($groups[$key])) {
+                $groups[$key] = [
+                    'template' => $template,
+                    'rows' => [],
+                ];
+            }
+
+            $groups[$key]['rows'][] = $row;
+        }
+
+        return $groups;
     }
 
     private function getSkuProductTypeLookup()
@@ -660,6 +647,11 @@ class DataProcessingService
     private function generateCtcxOutputFilename($sourceFilename)
     {
         return $this->withXlsxExtension('order_output_彩图刺绣' . $this->extractFilenameKey($sourceFilename));
+    }
+
+    private function generateTemplateOutputFilename($templateLabel, $sourceFilename)
+    {
+        return $this->withXlsxExtension('order_output_' . $templateLabel . $this->extractFilenameKey($sourceFilename));
     }
 
     private function generateArchiveFilename($filenameKey)
@@ -1008,6 +1000,21 @@ class DataProcessingService
         return implode('/', $parts);
     }
 
+    private function setTemplateCellValue($sheet, array $headers, $column, $row, $value, array &$imageTempFiles, $embeddedImagePath = null)
+    {
+        if ($this->shouldRenderImageColumn($headers, $column)) {
+            $this->setCellValueOrImage($sheet, $column, $row, $value, $imageTempFiles, $embeddedImagePath);
+        } else {
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
+        }
+
+        if ($this->shouldWrapTemplateColumn($headers, $column, $value)) {
+            $sheet->getStyleByColumnAndRow($column, $row)
+                ->getAlignment()
+                ->setWrapText(true);
+        }
+    }
+
     private function setCellValueOrImage($sheet, $column, $row, $value, array &$imageTempFiles, $embeddedImagePath = null)
     {
         $value = trim((string) $value);
@@ -1019,6 +1026,22 @@ class DataProcessingService
                 $this->insertImageIntoCell($sheet, $column, $row, $imagePath);
                 return;
             }
+        }
+
+        if ($this->isImageFilePath($value)) {
+            $imagePath = $this->prepareImageForExcel($value, $imageTempFiles);
+
+            if ($imagePath !== null) {
+                $this->insertImageIntoCell($sheet, $column, $row, $imagePath);
+                return;
+            }
+        }
+
+        $mixedImageReferences = $this->extractImageReferences($value);
+
+        if (!empty($mixedImageReferences) && !$this->isSingleImageReference($value, $mixedImageReferences)) {
+            $this->setCellValueWithMixedImages($sheet, $column, $row, $value, $mixedImageReferences, $imageTempFiles);
+            return;
         }
 
         if (!$this->isImageUrl($value)) {
@@ -1036,7 +1059,40 @@ class DataProcessingService
         $this->insertImageIntoCell($sheet, $column, $row, $imagePath);
     }
 
-    private function insertImageIntoCell($sheet, $column, $row, $imagePath)
+    private function setCellValueWithMixedImages($sheet, $column, $row, $value, array $imageReferences, array &$imageTempFiles)
+    {
+        $text = $this->stripImageReferencesFromText($value, $imageReferences);
+        $sheet->setCellValueByColumnAndRow($column, $row, $text);
+        $sheet->getStyleByColumnAndRow($column, $row)->getAlignment()->setWrapText(true);
+
+        $inserted = 0;
+
+        foreach ($imageReferences as $reference) {
+            $imagePath = null;
+
+            if ($this->isImageFilePath($reference)) {
+                $imagePath = $this->prepareImageForExcel($reference, $imageTempFiles);
+            } elseif ($this->isImageUrl($reference)) {
+                $imagePath = $this->downloadImageForExcel($reference, $imageTempFiles);
+            }
+
+            if ($imagePath === null) {
+                continue;
+            }
+
+            $this->insertImageIntoCell($sheet, $column, $row, $imagePath, false, 38, 4, 22 + ($inserted * 44));
+            $inserted++;
+        }
+
+        if ($inserted === 0) {
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
+            return;
+        }
+
+        $sheet->getRowDimension($row)->setRowHeight(max($sheet->getRowDimension($row)->getRowHeight(), 24 + ($inserted * 44)));
+    }
+
+    private function insertImageIntoCell($sheet, $column, $row, $imagePath, $clearCell = true, $height = 68, $offsetX = 4, $offsetY = 4)
     {
         $coordinate = PHPExcel_Cell::stringFromColumnIndex($column) . $row;
         $drawing = new \PHPExcel_Worksheet_Drawing();
@@ -1045,13 +1101,16 @@ class DataProcessingService
         $drawing->setPath($imagePath);
         $drawing->setCoordinates($coordinate);
         $drawing->setResizeProportional(true);
-        $drawing->setHeight(68);
-        $drawing->setOffsetX(4);
-        $drawing->setOffsetY(4);
+        $drawing->setHeight($height);
+        $drawing->setOffsetX($offsetX);
+        $drawing->setOffsetY($offsetY);
         $drawing->setWorksheet($sheet);
 
-        $sheet->setCellValueByColumnAndRow($column, $row, '');
-        $sheet->getRowDimension($row)->setRowHeight(58);
+        if ($clearCell) {
+            $sheet->setCellValueByColumnAndRow($column, $row, '');
+        }
+
+        $sheet->getRowDimension($row)->setRowHeight(max($sheet->getRowDimension($row)->getRowHeight(), $height - 10));
     }
 
     private function isImageUrl($value)
@@ -1060,8 +1119,82 @@ class DataProcessingService
             return false;
         }
 
-        return preg_match('/\.(png|jpe?g|gif|webp)(\?|$)/i', $value) === 1
-            || strpos($value, 'cdn.shopify.com') !== false;
+        return true;
+    }
+
+    private function isImageFilePath($value)
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        return file_exists($value) && @getimagesize($value) !== false;
+    }
+
+    private function extractImageReferences($value)
+    {
+        $references = [];
+
+        if (!is_string($value) || trim($value) === '') {
+            return $references;
+        }
+
+        if (preg_match_all('/https?:\/\/[^\s]+/i', $value, $matches)) {
+            foreach ($matches[0] as $match) {
+                $references[] = rtrim($match, " \t\r\n,，;；");
+            }
+        }
+
+        foreach (preg_split('/\r\n|\n|\r/', $value) as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $candidates = [$line];
+
+            if (strpos($line, '：') !== false) {
+                $parts = explode('：', $line, 2);
+                $candidates[] = trim($parts[1]);
+            }
+
+            foreach ($candidates as $candidate) {
+                if ($this->isImageFilePath($candidate)) {
+                    $references[] = $candidate;
+                }
+            }
+        }
+
+        return array_values(array_unique($references));
+    }
+
+    private function isSingleImageReference($value, array $references)
+    {
+        return count($references) === 1 && trim((string) $value) === $references[0];
+    }
+
+    private function stripImageReferencesFromText($value, array $references)
+    {
+        $text = (string) $value;
+
+        foreach ($references as $reference) {
+            $text = str_replace($reference, '', $text);
+        }
+
+        $lines = [];
+
+        foreach (preg_split('/\r\n|\n|\r/', $text) as $line) {
+            $line = rtrim($line);
+
+            if (trim($line) === '') {
+                continue;
+            }
+
+            $lines[] = $line;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function downloadImageForExcel($url, array &$imageTempFiles)
@@ -1214,40 +1347,7 @@ class DataProcessingService
 
     private function getCtcxHeaders()
     {
-        return [
-            '导表日期',
-            '订单号',
-            '款图',
-            '是否做货',
-            '款式',
-            '衣服颜色',
-            '尺码',
-            '数量',
-            '左袖文本',
-            '左袖图标',
-            '左袖字体',
-            '备注',
-            '袖子位置',
-            '右袖文本',
-            '右袖图标',
-            '备注',
-            '袖子位置',
-            '袖子绣线颜色',
-            '胸部文字风格',
-            '胸部文本',
-            '全彩/轮廓',
-            '胸部文本颜色',
-            '胸部图片',
-            'this字体',
-            '第二行字体',
-            '第三行字体',
-            '胸部位置',
-            '贺卡',
-            '礼品袋',
-            '设计稿',
-            'sku',
-            '产品规格'
-        ];
+        return $this->templateRegistry->forChineseName('彩图刺绣')->headers();
     }
 
     private function adjustColumnWidths($sheet, $columnCount)
@@ -1256,5 +1356,64 @@ class DataProcessingService
             $letter = PHPExcel_Cell::stringFromColumnIndex($column);
             $sheet->getColumnDimension($letter)->setWidth($column === 0 ? 20 : 10);
         }
+    }
+
+    private function adjustImageColumns($sheet, array $headers)
+    {
+        foreach ($headers as $column => $header) {
+            if ($this->shouldRenderImageColumn($headers, $column)) {
+                $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(18);
+            }
+        }
+    }
+
+    private function adjustReviewColumns($sheet, array $headers)
+    {
+        foreach ($headers as $column => $header) {
+            if ($header === '产品规格') {
+                $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(45);
+            }
+
+            if ($header === 'sku' || $header === 'cleaned_sku') {
+                $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(22);
+            }
+        }
+    }
+
+    private function shouldRenderImageColumn(array $headers, $column)
+    {
+        if (!isset($headers[$column]) || $this->isProductSpecsColumn($headers, $column)) {
+            return false;
+        }
+
+        $header = (string) $headers[$column];
+
+        if ($header === 'sku' || $header === 'cleaned_sku') {
+            return false;
+        }
+
+        if ($column === 2) {
+            return true;
+        }
+
+        foreach (['图片', '图标', '字体', '设计稿', '主图', '款图', '款式图', '产品图', '订单图片'] as $needle) {
+            if (strpos($header, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function shouldWrapTemplateColumn(array $headers, $column, $value)
+    {
+        return $this->isProductSpecsColumn($headers, $column)
+            || ($column === 19 && !empty($value))
+            || (is_string($value) && strpos($value, "\n") !== false);
+    }
+
+    private function isProductSpecsColumn(array $headers, $column)
+    {
+        return isset($headers[$column]) && $headers[$column] === '产品规格';
     }
 }
