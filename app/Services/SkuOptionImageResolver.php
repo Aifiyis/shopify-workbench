@@ -26,6 +26,10 @@ class SkuOptionImageResolver
             return '';
         }
 
+        if ($this->isIgnoredPlaceholderValue($optionValue)) {
+            return '';
+        }
+
         foreach ($this->productsById as $productId => $product) {
             if ($this->normalizeSku($product['cleaned_sku'] ?? '') !== $cleanedSku
                 && $this->normalizeSku($product['sku'] ?? '') !== $cleanedSku
@@ -33,8 +37,22 @@ class SkuOptionImageResolver
                 continue;
             }
 
-            foreach ($this->optionsByProductId[$productId] ?? [] as $option) {
+            $options = $this->optionsByProductId[$productId] ?? [];
+
+            foreach ($options as $option) {
                 if ($this->normalizeText($option['option_name'] ?? '') !== $optionNameKey) {
+                    continue;
+                }
+
+                if ($this->normalizeText($option['image_value'] ?? '') !== $optionValueKey) {
+                    continue;
+                }
+
+                return $this->imageReference($option);
+            }
+
+            foreach ($options as $option) {
+                if (!$this->optionNamesAreCompatible($optionNameKey, $this->normalizeText($option['option_name'] ?? ''))) {
                     continue;
                 }
 
@@ -97,14 +115,28 @@ class SkuOptionImageResolver
         $imagePath = trim((string) ($option['image_path'] ?? ''));
 
         if ($imagePath !== '') {
+            if ($this->isNoThanksImageReference($imagePath)) {
+                return '';
+            }
+
             $absolutePath = $this->absoluteImagePath($imagePath);
 
             if ($absolutePath !== '' && file_exists($absolutePath)) {
+                if ($this->isNoThanksImageReference($absolutePath)) {
+                    return '';
+                }
+
                 return $absolutePath;
             }
         }
 
-        return trim((string) ($option['source_image_url'] ?? ''));
+        $sourceImageUrl = trim((string) ($option['source_image_url'] ?? ''));
+
+        if ($this->isNoThanksImageReference($sourceImageUrl)) {
+            return '';
+        }
+
+        return $sourceImageUrl;
     }
 
     private function absoluteImagePath($imagePath)
@@ -129,8 +161,84 @@ class SkuOptionImageResolver
     private function normalizeText($value)
     {
         $value = strtolower(trim((string) $value));
+        $value = preg_replace('/\s*[\(\x{FF08}]\s*\+\s*(?:\$|usd)?\s*[\d.,]+.*?[\)\x{FF09}]\s*/iu', ' ', $value);
         $value = preg_replace('/\s+/', ' ', $value);
 
-        return $value;
+        return trim($value);
+    }
+
+    private function optionNamesAreCompatible($requestedName, $candidateName)
+    {
+        $requestedCategory = $this->optionNameCategory($requestedName);
+        $candidateCategory = $this->optionNameCategory($candidateName);
+
+        if ($requestedCategory === '' || $candidateCategory === '') {
+            return false;
+        }
+
+        if ($requestedCategory === $candidateCategory) {
+            return true;
+        }
+
+        if ($requestedCategory === 'icon') {
+            return in_array($candidateCategory, ['icon', 'left_icon', 'right_icon'], true);
+        }
+
+        if ($candidateCategory === 'icon') {
+            return in_array($requestedCategory, ['icon', 'left_icon', 'right_icon'], true);
+        }
+
+        return false;
+    }
+
+    private function optionNameCategory($name)
+    {
+        if (strpos($name, 'greeting card') !== false) {
+            return 'greeting_card';
+        }
+
+        if (strpos($name, 'gift bag') !== false) {
+            return 'gift_bag';
+        }
+
+        if (strpos($name, 'icon') !== false || strpos($name, 'pattern') !== false) {
+            if (strpos($name, 'left sleeve') !== false) {
+                return 'left_icon';
+            }
+
+            if (strpos($name, 'right sleeve') !== false) {
+                return 'right_icon';
+            }
+
+            return 'icon';
+        }
+
+        return '';
+    }
+
+    private function isIgnoredPlaceholderValue($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $value = preg_replace('/\s*[\(\x{FF08}]\s*\+\s*(?:\$|usd)?\s*[\d.,]+.*?[\)\x{FF09}]\s*/iu', ' ', $value);
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value);
+        $value = trim($value);
+
+        return $value === 'yes'
+            || $value === 'no'
+            || $value === 'no thank'
+            || $value === 'no thanks'
+            || $value === 'no thank you';
+    }
+
+    private function isNoThanksImageReference($value)
+    {
+        $value = strtolower(trim((string) $value));
+
+        return strpos($value, 'no-thanks') !== false
+            || strpos($value, 'no_thanks') !== false
+            || strpos($value, 'no thanks') !== false
+            || strpos($value, 'no-thank') !== false
+            || strpos($value, 'no_thank') !== false
+            || strpos($value, 'no thank') !== false;
     }
 }

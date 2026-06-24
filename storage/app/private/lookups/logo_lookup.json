@@ -1,0 +1,272 @@
+{
+    "Air Force Falcons": {
+        "group": "teamlogo",
+        "name": "Air Force Falcons",
+        "chinese_name": "\u7f8e\u56fd\u7a7a\u519b\u5b66\u9662\u730e\u9e70\u961f",
+        "image_path": "private/lookups/logo/air-force-falcons.png"
+    },
+    "Alabama Crimson Tide": {
+        "group": "teamlogo",
+        "name": "Alabama Crimson Tide",
+        "chinese_name": "\u963f\u62c9\u5df4\u9a6c\u5927\u5b66\u7ea2\u6f6e\u961f",
+        "image_path": "private/lookups/logo/alabama-crimson-tide.png"
+    },
+    "Arizona Wildcats": {
+        "group": "teamlogo",
+        "name": "Arizona Wildcats",
+        "chinese_name": "\u4e9a\u5229\u6851\u90a3\u5927\u5b66\u91ce\u732b\u961f",
+        "image_path": "private/lookups/logo/arizona-wildcats.png"
+    },
+    "Auburn Tigers": {
+        "group": "teamlogo",
+        "name": "Auburn Tigers",
+        "chinese_name": "\u5965\u672c\u5927\u5b66\u8001\u864e\u961f",
+        "image_path": "private/lookups/logo/auburn-tigers.png"
+    },
+    "Ball State Cardinals": {
+        "group": "teamlogo",
+        "name": "Ball State Cardinals",
+        "chinese_name": "\u6ce2\u5c14\u5dde\u7acb\u5927\u5b66\u7ea2\u8863\u4e3b\u6559\u961f",
+        "image_path": "private/lookups/logo/ball-state-cardinals.png"
+    },
+    "Boston College Eagles": {
+        "group": "teamlogo",
+        "name": "Boston College Eagles",
+        "chinese_name": "\u6ce2\u58eb\u987f\u5b66\u9662\u8001\u9e70\u961f",
+        "image_path": "private/lookups/logo/boston-college-eagles.png"
+    },
+    "Bowling Green Falcons": {
+        "group": "teamlogo",
+        "name": "Bowling Green Falcons",
+        "chinese_name": "\u9c8d\u7075\u683c\u6797\u5dde\u7acb\u5927\u5b66\u730e\u9e70\u961f",
+        "image_path": "private/lookups/logo/bowling-green-falcons.png"
+    },
+    "Central Michigan Chippewas": {
+        "group": "teamlogo",
+        "name": "Central Michigan Chippewas",
+        "chinese_name": "\u4e2d\u5bc6\u6b47\u6839\u5927\u5b66\u9f50\u73c0\u74e6\u4eba\u961f",
+        "image_path": "private/lookups/logo/central-michigan-chippewas.png"
+    },
+    "Clemson Tigers": {
+        "group": "teamlogo",
+        "name": "Clemson Tigers",
+        "chinese_name": "\u514b\u83b1\u59c6\u68ee\u5927\u5b66\u8001\u864e\u961f",
+        "image_path": "private/lookups/logo/clemson-tigers.png"
+    },
+    "Eastern Michigan Eagles": {
+        "group": "teamlogo",
+        "name": "Eastern Michigan Eagles",
+        "chinese_name": "\u4e1c\u5bc6\u6b47\u6839\u5927\u5b66\u8001\u9e70\u961f",
+        "image_path": "private/lookups/logo/eastern-michigan-eagles.png"
+    },
+    "Florida Gators": {
+        "group": "teamlogo",
+        "name": "Florida Gators",
+        "chinese_name": "\u4f5b\u7f57\u91cc\u8fbe\u5927\u5b66\u77ed\u543b\u9cc4\u961f",
+        "image_path": "private/lookups/logo/florida-gators.png"
+    },
+    "Florida International Panthers": {
+        "group": "teamlogo",
+        "name": "Florida International Panthers",
+        "chinese_name": "\u4f5b\u7f57\u91cc\u8fbe\u56fd\u9645\u5927\u5b66\u9ed1\u8c79\u961f",
+        "image_path": "private/lookups/logo/florida-international-panthers.png"
+    },
+    "Georgia Bulldogs": {
+        "group": "teamlogo",
+        "name": "Georgia Bulldogs",
+        "chinese_name": "\u4f50\u6cbb\u4e9a\u5927\u5b66\u6597\u725b\u72ac\u961f",
+        "image_path": "private/lookups/logo/georgia-bulldogs.png"
+    },
+    "Georgia Southern Eagles": {
+        "group": "teamlogo",
+        "name": "Georgia Southern Eagles",
+        "chinese_name": "\u4f50\u6cbb\u4e9a\u5357\u65b9\u5927\u5b66\u8001\u9e70\u961f",
+        "image_path": "private/lookups/logo/georgia-southern-eagles.png"
+    },
+    "Georgia State Panthers": {
+        "group": "teamlogo",
+        "name": "Georgia State Panthers",
+        "chinese_name": "\u4f50\u6cbb\u4e9a\u5dde\u7acb\u5927\u5b66\u9ed1\u8c79\u961f",
+        "image_path": "private/lookups/logo/georgia-state-panthers.png"
+    },
+    "Georgia Tech Yellow Jackets": {
+        "group": "teamlogo",
+        "name": "Georgia Tech Yellow Jackets",
+        "chinese_name": "\u4f50\u6cbb\u4e9a\u7406\u5de5\u5927\u9ec4\u8702\u961f",
+        "image_path": "private/lookups/logo/georgia-tech-yellow-jackets.png"
+    },
+    "Hawaii Rainbow Warriors": {
+        "group": "teamlogo",
+        "name": "Hawaii Rainbow Warriors",
+        "chinese_name": "\u590f\u5a01\u5937\u5927\u5b66\u5f69\u8679\u52c7\u58eb\u961f",
+        "image_path": "private/lookups/logo/hawaii-rainbow-warriors.png"
+    },
+    "Indiana Hoosiers": {
+        "group": "teamlogo",
+        "name": "Indiana Hoosiers",
+        "chinese_name": "\u5370\u7b2c\u5b89\u7eb3\u5927\u5b66\u5c71\u5730\u4eba\u961f",
+        "image_path": "private/lookups/logo/indiana-hoosiers.png"
+    },
+    "lowa Hawkeyes": {
+        "group": "teamlogo",
+        "name": "lowa Hawkeyes",
+        "chinese_name": "\u7231\u8377\u534e\u5927\u5b66\u9e70\u773c\u961f",
+        "image_path": "private/lookups/logo/lowa-hawkeyes.png"
+    },
+    "Kansas State Wildcats": {
+        "group": "teamlogo",
+        "name": "Kansas State Wildcats",
+        "chinese_name": "\u582a\u8428\u65af\u5dde\u7acb\u5927\u5b66\u91ce\u732b\u961f",
+        "image_path": "private/lookups/logo/kansas-state-wildcats.png"
+    },
+    "Kentucky Wildcats": {
+        "group": "teamlogo",
+        "name": "Kentucky Wildcats",
+        "chinese_name": "\u80af\u5854\u57fa\u5927\u5b66\u91ce\u732b\u961f",
+        "image_path": "private/lookups/logo/kentucky-wildcats.png"
+    },
+    "Louisiana Tech Bulldogs": {
+        "group": "teamlogo",
+        "name": "Louisiana Tech Bulldogs",
+        "chinese_name": "\u8def\u6613\u65af\u5b89\u90a3\u7406\u5de5\u5927\u5b66\u6597\u725b\u72ac\u961f",
+        "image_path": "private/lookups/logo/louisiana-tech-bulldogs.png"
+    },
+    "Louisville Cardinals": {
+        "group": "teamlogo",
+        "name": "Louisville Cardinals",
+        "chinese_name": "\u8def\u6613\u65af\u7ef4\u5c14\u5927\u5b66\u7ea2\u96c0\u961f",
+        "image_path": "private/lookups/logo/louisville-cardinals.png"
+    },
+    "LSU Tigers": {
+        "group": "teamlogo",
+        "name": "LSU Tigers",
+        "chinese_name": "\u8def\u6613\u65af\u5b89\u90a3\u5dde\u7acb\u5927\u5b66\u8001\u864e\u961f",
+        "image_path": "private/lookups/logo/lsu-tigers.png"
+    },
+    "Memphis Tigers": {
+        "group": "teamlogo",
+        "name": "Memphis Tigers",
+        "chinese_name": "\u5b5f\u83f2\u65af\u5927\u5b66\u8001\u864e\u961f",
+        "image_path": "private/lookups/logo/memphis-tigers.png"
+    },
+    "Michigan State Spartans": {
+        "group": "teamlogo",
+        "name": "Michigan State Spartans",
+        "chinese_name": "\u5bc6\u6b47\u6839\u5dde\u7acb\u5927\u5b66\u65af\u5df4\u8fbe\u52c7\u58eb\u961f",
+        "image_path": "private/lookups/logo/michigan-state-spartans.png"
+    },
+    "Michigan Wolverines": {
+        "group": "teamlogo",
+        "name": "Michigan Wolverines",
+        "chinese_name": "\u5bc6\u6b47\u6839\u5927\u5b66\u72fc\u737e\u961f",
+        "image_path": "private/lookups/logo/michigan-wolverines.png"
+    },
+    "Middle Tennessee Blue Raiders": {
+        "group": "teamlogo",
+        "name": "Middle Tennessee Blue Raiders",
+        "chinese_name": "\u4e2d\u7530\u7eb3\u897f\u5927\u5b66\u84dd\u8272\u7a81\u88ad\u8005\u961f",
+        "image_path": "private/lookups/logo/middle-tennessee-blue-raiders.png"
+    },
+    "Missouri Tigers": {
+        "group": "teamlogo",
+        "name": "Missouri Tigers",
+        "chinese_name": "\u5bc6\u82cf\u91cc\u5927\u5b66\u8001\u864e\u961f",
+        "image_path": "private/lookups/logo/missouri-tigers.png"
+    },
+    "Nebraska Cornhuskers": {
+        "group": "teamlogo",
+        "name": "Nebraska Cornhuskers",
+        "chinese_name": "\u5185\u5e03\u62c9\u65af\u52a0\u5927\u5b66\u5265\u7389\u7c73\u4eba\u961f",
+        "image_path": "private/lookups/logo/nebraska-cornhuskers.png"
+    },
+    "Northwestern Wildcats": {
+        "group": "teamlogo",
+        "name": "Northwestern Wildcats",
+        "chinese_name": "\u897f\u5317\u5927\u5b66\u91ce\u732b\u961f",
+        "image_path": "private/lookups/logo/northwestern-wildcats.png"
+    },
+    "Notre Dame Fighting Irish": {
+        "group": "teamlogo",
+        "name": "Notre Dame Fighting Irish",
+        "chinese_name": "\u5723\u6bcd\u5927\u5b66\u7231\u5c14\u5170\u6218\u58eb\u961f",
+        "image_path": "private/lookups/logo/notre-dame-fighting-irish.png"
+    },
+    "Ohio State Buckeyes": {
+        "group": "teamlogo",
+        "name": "Ohio State Buckeyes",
+        "chinese_name": "\u4fc4\u4ea5\u4fc4\u5dde\u7acb\u5927\u5b66\u4e03\u53f6\u6811\u961f",
+        "image_path": "private/lookups/logo/ohio-state-buckeyes.png"
+    },
+    "Oklahoma Sooners": {
+        "group": "teamlogo",
+        "name": "Oklahoma Sooners",
+        "chinese_name": "\u4fc4\u514b\u62c9\u8377\u9a6c\u5927\u5b66\u6377\u8db3\u8005\u961f",
+        "image_path": "private/lookups/logo/oklahoma-sooners.png"
+    },
+    "Oklahoma State Cowboys": {
+        "group": "teamlogo",
+        "name": "Oklahoma State Cowboys",
+        "chinese_name": "\u4fc4\u514b\u62c9\u8377\u9a6c\u5dde\u7acb\u5927\u5b66\u725b\u4ed4\u961f",
+        "image_path": "private/lookups/logo/oklahoma-state-cowboys.png"
+    },
+    "Ole Miss Rebels": {
+        "group": "teamlogo",
+        "name": "Ole Miss Rebels",
+        "chinese_name": "\u5bc6\u897f\u897f\u6bd4\u5927\u5b66\u53db\u519b\u961f",
+        "image_path": "private/lookups/logo/ole-miss-rebels.png"
+    },
+    "Penn State Nittany Lions": {
+        "group": "teamlogo",
+        "name": "Penn State Nittany Lions",
+        "chinese_name": "\u5bbe\u5915\u6cd5\u5c3c\u4e9a\u5dde\u7acb\u5927\u5b66\u5c3c\u5854\u5c3c\u96c4\u72ee\u961f",
+        "image_path": "private/lookups/logo/penn-state-nittany-lions.png"
+    },
+    "Pittsburgh Panthers": {
+        "group": "teamlogo",
+        "name": "Pittsburgh Panthers",
+        "chinese_name": "\u5339\u5179\u5821\u5927\u5b66\u9ed1\u8c79\u961f",
+        "image_path": "private/lookups/logo/pittsburgh-panthers.png"
+    },
+    "SMU Mustangs": {
+        "group": "teamlogo",
+        "name": "SMU Mustangs",
+        "chinese_name": "\u5357\u536b\u7406\u516c\u4f1a\u5927\u5b66\u91ce\u9a6c\u961f",
+        "image_path": "private/lookups/logo/smu-mustangs.png"
+    },
+    "South Alabama Jaguars": {
+        "group": "teamlogo",
+        "name": "South Alabama Jaguars",
+        "chinese_name": "\u5357\u963f\u62c9\u5df4\u9a6c\u5927\u5b66\u7f8e\u6d32\u8c79\u961f",
+        "image_path": "private/lookups/logo/south-alabama-jaguars.png"
+    },
+    "Southern Miss Golden Eagles": {
+        "group": "teamlogo",
+        "name": "Southern Miss Golden Eagles",
+        "chinese_name": "\u5357\u5bc6\u897f\u897f\u6bd4\u5927\u5b66\u91d1\u96d5\u961f",
+        "image_path": "private/lookups/logo/southern-miss-golden-eagles.png"
+    },
+    "Texas Tech Red Raiders": {
+        "group": "teamlogo",
+        "name": "Texas Tech Red Raiders",
+        "chinese_name": "\u5f97\u5dde\u7406\u5de5\u7ea2\u8272\u7a81\u88ad\u8005\u961f",
+        "image_path": "private/lookups/logo/texas-tech-red-raiders.png"
+    },
+    "Western Kentucky Hilltoppers": {
+        "group": "teamlogo",
+        "name": "Western Kentucky Hilltoppers",
+        "chinese_name": "\u897f\u80af\u5854\u57fa\u5927\u5b66\u767b\u5c71\u8005\u961f",
+        "image_path": "private/lookups/logo/western-kentucky-hilltoppers.png"
+    },
+    "Western Michigan Broncos": {
+        "group": "teamlogo",
+        "name": "Western Michigan Broncos",
+        "chinese_name": "\u897f\u5bc6\u6b47\u6839\u5927\u5b66\u91ce\u9a6c\u961f",
+        "image_path": "private/lookups/logo/western-michigan-broncos.png"
+    },
+    "Wyoming Cowboys": {
+        "group": "teamlogo",
+        "name": "Wyoming Cowboys",
+        "chinese_name": "\u6000\u4fc4\u660e\u5927\u5b66\u725b\u4ed4\u961f",
+        "image_path": "private/lookups/logo/wyoming-cowboys.png"
+    }
+}

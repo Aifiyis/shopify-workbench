@@ -59,21 +59,22 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         $sku = (string) ($row['sku'] ?? '');
         $attributes = $this->attributesAfter($row['product_specs'] ?? '', 0);
         $colorLookup = $context['color_lookup'] ?? [];
+        $colorTranslator = $context['color_translation_resolver'] ?? null;
 
-        $values = $this->applyOptionNameRules($values, $attributes, $row, $context, $colorLookup);
+        $values = $this->applyOptionNameRules($values, $attributes, $row, $context, $colorLookup, $colorTranslator);
 
         if (strpos($sku, 'CS-QK0743-CX') !== false) {
-            return $this->applyQk0743Rules($values, $attributes, $colorLookup);
+            return $this->applyDefaultChestPosition($this->applyQk0743Rules($values, $attributes, $colorLookup, $colorTranslator));
         }
 
         if (strpos($sku, 'CS-QK2571-CX') !== false) {
-            return $this->applyQk2571Rules($values, $attributes);
+            return $this->applyDefaultChestPosition($this->applyQk2571Rules($values, $attributes));
         }
 
-        return $values;
+        return $this->applyDefaultChestPosition($values);
     }
 
-    private function applyOptionNameRules(array $values, array $attributes, array $row, array $context, array $colorLookup)
+    private function applyOptionNameRules(array $values, array $attributes, array $row, array $context, array $colorLookup, $colorTranslator)
     {
         $lineValues = [
             1 => '',
@@ -118,16 +119,9 @@ class CtcxTemplate extends AbstractOrderExportTemplate
                 $fontLines[] = $name . '：' . ($image !== '' ? $image : $value);
             }
 
-            if ($name === 'Color for Initials') {
-                $colorValues[1] = $this->translateColorList($value, $colorLookup);
-            }
-
-            if ($name === 'Color for 2nd Line') {
-                $colorValues[2] = $this->translateColorList($value, $colorLookup);
-            }
-
-            if ($name === 'Color for 3rd Line') {
-                $colorValues[3] = $this->translateColorList($value, $colorLookup);
+            $lineColorNumber = $this->lineColorNumberFromOptionName($lowerName);
+            if ($lineColorNumber !== null) {
+                $colorValues[$lineColorNumber] = $this->translateColorList($value, $colorLookup, $colorTranslator);
             }
         }
 
@@ -136,7 +130,7 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         }
 
         if ($this->hasAnyLineValue($colorValues)) {
-            $this->setHeaderValueIfBlank($values, '胸部信息颜色', $this->formatThreeLines($colorValues));
+            $this->setHeaderValue($values, '胸部信息颜色', $this->formatThreeLines($colorValues));
         }
 
         if (!empty($fontLines)) {
@@ -146,12 +140,45 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         return $values;
     }
 
+    private function applyDefaultChestPosition(array $values)
+    {
+        $this->setHeaderValueIfBlank($values, '胸部位置', '胸部中央');
+
+        return $values;
+    }
+
     private function isSecondAndThirdLinePrompt($lowerName)
     {
         return strpos($lowerName, 'add 2nd line & 3rd line text') !== false;
     }
 
-    private function applyQk0743Rules(array $values, array $attributes, array $colorLookup)
+    protected function shouldSkipCommonColorRule($lowerName)
+    {
+        return $this->lineColorNumberFromOptionName($lowerName) !== null;
+    }
+
+    private function lineColorNumberFromOptionName($lowerName)
+    {
+        if (strpos($lowerName, 'color') === false) {
+            return null;
+        }
+
+        if (strpos($lowerName, 'initials') !== false) {
+            return 1;
+        }
+
+        if (strpos($lowerName, '2nd line') !== false || strpos($lowerName, 'second line') !== false) {
+            return 2;
+        }
+
+        if (strpos($lowerName, '3rd line') !== false || strpos($lowerName, 'third line') !== false) {
+            return 3;
+        }
+
+        return null;
+    }
+
+    private function applyQk0743Rules(array $values, array $attributes, array $colorLookup, $colorTranslator)
     {
         $chestTextLines = [];
 
@@ -167,7 +194,7 @@ class CtcxTemplate extends AbstractOrderExportTemplate
             }
 
             if (strpos($name, 'thread color') !== false) {
-                $this->setHeaderValueIfBlank($values, '胸部信息颜色', $this->translateLookupValue($attribute['value'], $colorLookup));
+                $this->setHeaderValueIfBlank($values, '胸部信息颜色', $this->translateLookupValue($attribute['value'], $colorLookup, $colorTranslator));
             }
         }
 
@@ -204,7 +231,7 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         return $values;
     }
 
-    private function translateColorList($value, array $colorLookup)
+    private function translateColorList($value, array $colorLookup, $colorTranslator)
     {
         $parts = preg_split('/[,，]/', (string) $value);
         $translatedParts = [];
@@ -216,7 +243,7 @@ class CtcxTemplate extends AbstractOrderExportTemplate
                 continue;
             }
 
-            $translatedParts[] = $this->translateLookupValue($part, $colorLookup);
+            $translatedParts[] = $this->translateLookupValue($part, $colorLookup, $colorTranslator);
         }
 
         return implode(', ', $translatedParts);
@@ -235,9 +262,22 @@ class CtcxTemplate extends AbstractOrderExportTemplate
 
     private function formatThreeLines(array $lineValues)
     {
-        return '第一行：' . ($lineValues[1] ?? '')
-            . "\n" . '第二行：' . ($lineValues[2] ?? '')
-            . "\n" . '第三行：' . ($lineValues[3] ?? '');
+        $lines = [];
+        $labels = [
+            1 => '第一行',
+            2 => '第二行',
+            3 => '第三行',
+        ];
+
+        foreach ($lineValues as $lineNumber => $value) {
+            if (trim((string) $value) === '') {
+                continue;
+            }
+
+            $lines[] = ($labels[$lineNumber] ?? ('第' . $lineNumber . '行')) . '：' . $value;
+        }
+
+        return implode("\n", $lines);
     }
 
     private function formatEstYearPart($yearValue)

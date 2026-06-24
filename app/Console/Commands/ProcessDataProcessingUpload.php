@@ -15,6 +15,8 @@ class ProcessDataProcessingUpload extends Command
 
     private $dataProcessingService;
 
+    private $fatalErrorMemoryReserve;
+
     public function __construct(DataProcessingService $dataProcessingService)
     {
         parent::__construct();
@@ -23,7 +25,14 @@ class ProcessDataProcessingUpload extends Command
 
     public function handle()
     {
+        @ini_set('memory_limit', '1024M');
+        $this->fatalErrorMemoryReserve = str_repeat('x', 1024 * 1024);
+
         $processedFileId = (int) $this->argument('processedFileId');
+        register_shutdown_function(function () use ($processedFileId) {
+            $this->markProcessingFileFailedFromFatal($processedFileId);
+        });
+
         $processedFile = ProcessedFile::find($processedFileId);
 
         if (!$processedFile) {
@@ -98,6 +107,52 @@ class ProcessDataProcessingUpload extends Command
             $this->error($e->getMessage());
             return 1;
         }
+    }
+
+    private function markProcessingFileFailedFromFatal($processedFileId, array $error = null)
+    {
+        $this->fatalErrorMemoryReserve = null;
+
+        $error = $error ?: error_get_last();
+        if (!$this->isFatalError($error)) {
+            return;
+        }
+
+        $processedFile = ProcessedFile::find((int) $processedFileId);
+        if (!$processedFile || $processedFile->status !== 'processing') {
+            return;
+        }
+
+        $message = 'Fatal error: ' . ($error['message'] ?? 'Unknown fatal error');
+        if (!empty($error['file']) || !empty($error['line'])) {
+            $message .= ' at ' . ($error['file'] ?? 'unknown file') . ':' . ($error['line'] ?? 0);
+        }
+
+        $processedFile->update([
+            'status' => 'failed',
+            'error_message' => $message,
+        ]);
+
+        Log::error('Background data processing failed with fatal error.', [
+            'processed_file_id' => $processedFile->id,
+            'error' => $message,
+        ]);
+    }
+
+    private function isFatalError($error)
+    {
+        if (!is_array($error)) {
+            return false;
+        }
+
+        return in_array($error['type'] ?? null, [
+            E_ERROR,
+            E_PARSE,
+            E_CORE_ERROR,
+            E_COMPILE_ERROR,
+            E_USER_ERROR,
+            E_RECOVERABLE_ERROR,
+        ], true);
     }
 
     private function uniqueProcessedFilename(ProcessedFile $processedFile, $outputFilename, $outputPath)

@@ -1,0 +1,113 @@
+{
+    "rules": [
+        {
+            "website": "broderft.com",
+            "position": "\u5de6\u80f8\u53e3",
+            "cleaned_skus": [
+                "CS-QK3312-TH",
+                "CS-QK3313-TH",
+                "CS-QK3314-TH",
+                "CS-QK2494-TH",
+                "CS-QK6139-CX",
+                "CS-QK1948-TH",
+                "CS-QK1990-TH",
+                "CS-QK2812-TH",
+                "CS-QK2459-TH",
+                "CS-MYX7660-TH",
+                "CS-MYX7661-TH",
+                "CS-QK0093-TH",
+                "CS-QK2846-TH",
+                "CS-QK0139-TH",
+                "CS-QK2590-CX",
+                "CS-MYX6616-TH",
+                "CS-QK3558-TH",
+                "CS-QK0006-CX",
+                "CS-QK4027-CX",
+                "CS-QK2849-TH",
+                "CS-QK0106-TH",
+                "CS-QK0761-CX",
+                "CS-QK0765-CX"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u5de6\u80f8\u548c\u540e\u80cc",
+            "placement_behavior": "only_chest",
+            "cleaned_skus": [
+                "CS-QK1997-TH",
+                "CS-QK2814-TH",
+                "CS-QK0792-TH"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u5de6\u80f8\u548c\u540e\u80cc",
+            "placement_behavior": "mirror_chest_to_back",
+            "cleaned_skus": [
+                "CS-LXJ7422-TH",
+                "CS-LXJ7445-TH",
+                "CS-QK0138-TH",
+                "CS-QK2804-TH",
+                "CS-QK2831-TH",
+                "CS-QK1953-TH"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u5de6\u80f8\u548c\u540e\u80cc",
+            "placement_behavior": "split_chest_back",
+            "cleaned_skus": [
+                "CS-QK0002-TH",
+                "CS-QK0776-TH",
+                "CS-QK0650-TH"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u5de6\u8896\u548c\u80f8\u90e8\u4e2d\u592e",
+            "cleaned_skus": [
+                "CS-CX-QK2584"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u80f8\u90e8\u4e2d\u592e\u548c\u540e\u80cc",
+            "placement_behavior": "split_chest_back",
+            "cleaned_skus": [
+                "CS-QK0551-TH",
+                "CS-QK2529-TH",
+                "CS-NXX8645-TH",
+                "CS-MYX6695-TH"
+            ]
+        },
+        {
+            "website": "broderft.com",
+            "position": "\u80cc\u90e8\u4e2d\u592e",
+            "cleaned_skus": [
+                "CS-QK0399-TH"
+            ]
+        },
+        {
+            "website": "embroiderely.com",
+            "position": "\u5de6\u80f8\u53e3",
+            "cleaned_skus": [
+                "CS-QK2565-CX",
+                "CS-QK3265-TH",
+                "CS-QK3602-CX",
+                "CS-QK1858-CX",
+                "CS-QK1624-CX",
+                "CS-QK3603-CX",
+                "CS-QK1503-CX",
+                "CS-QK3252-CX",
+                "CS-QK1568-CX"
+            ]
+        },
+        {
+            "website": "embroiderely.com",
+            "position": "\u53f3\u80f8\u53e3",
+            "cleaned_skus": [
+                "CS-QK2594-CX"
+            ]
+        }
+    ]
+}

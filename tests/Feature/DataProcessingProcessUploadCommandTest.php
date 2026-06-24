@@ -65,4 +65,43 @@ class DataProcessingProcessUploadCommandTest extends TestCase
         ]);
         $this->assertFileDoesNotExist($tempPath);
     }
+
+    public function test_process_upload_command_fatal_shutdown_marks_processing_file_failed()
+    {
+        $admin = Admin::create([
+            'name' => 'Test Admin',
+            'email' => 'fatal-command-admin@example.test',
+            'password' => Hash::make('password'),
+            'role' => 'super',
+            'is_active' => true,
+        ]);
+
+        $processedFile = ProcessedFile::create([
+            'admin_id' => $admin->id,
+            'original_filename' => 'order_test.xlsx',
+            'processed_filename' => 'processing_test.xlsx',
+            'file_path' => storage_path('app/temp/test-command-upload.xlsx'),
+            'status' => 'processing',
+            'uploaded_at' => now(),
+            'expires_at' => now()->addHour(),
+        ]);
+
+        $command = app(\App\Console\Commands\ProcessDataProcessingUpload::class);
+        $reflection = new \ReflectionClass($command);
+        $method = $reflection->getMethod('markProcessingFileFailedFromFatal');
+        $method->setAccessible(true);
+
+        $method->invoke($command, $processedFile->id, [
+            'type' => E_ERROR,
+            'message' => 'Allowed memory size of 268435456 bytes exhausted',
+            'file' => 'D:\\workspace\\shopify-workbench\\app\\Services\\DataProcessingService.php',
+            'line' => 1373,
+        ]);
+
+        $this->assertDatabaseHas('processed_files', [
+            'id' => $processedFile->id,
+            'status' => 'failed',
+            'error_message' => 'Fatal error: Allowed memory size of 268435456 bytes exhausted at D:\\workspace\\shopify-workbench\\app\\Services\\DataProcessingService.php:1373',
+        ]);
+    }
 }

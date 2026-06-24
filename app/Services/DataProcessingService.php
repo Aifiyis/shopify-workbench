@@ -15,18 +15,27 @@ class DataProcessingService
     private $skuCleaningService;
     private $templateRegistry;
     private $skuOptionImageResolver;
+    private $skuPlacementResolver;
+    private $logoLookupResolver;
+    private $colorTranslationResolver;
 
     public function __construct(
         LookupService $lookupService,
         SkuCleaningService $skuCleaningService = null,
         OrderExportTemplateRegistry $templateRegistry = null,
-        SkuOptionImageResolver $skuOptionImageResolver = null
+        SkuOptionImageResolver $skuOptionImageResolver = null,
+        SkuPlacementResolver $skuPlacementResolver = null,
+        LogoLookupResolver $logoLookupResolver = null,
+        ColorTranslationResolver $colorTranslationResolver = null
     )
     {
         $this->lookupService = $lookupService;
         $this->skuCleaningService = $skuCleaningService ?: new SkuCleaningService();
         $this->templateRegistry = $templateRegistry ?: OrderExportTemplateRegistry::default();
         $this->skuOptionImageResolver = $skuOptionImageResolver ?: new SkuOptionImageResolver();
+        $this->skuPlacementResolver = $skuPlacementResolver ?: new SkuPlacementResolver();
+        $this->logoLookupResolver = $logoLookupResolver ?: new LogoLookupResolver();
+        $this->colorTranslationResolver = $colorTranslationResolver ?: ColorTranslationResolver::fromConfig();
     }
 
     public function processOrderFileAll($sourceFilePath, $sourceFilename = null)
@@ -76,6 +85,9 @@ class DataProcessingService
                     [
                         'color_lookup' => $colorLookup,
                         'sku_option_image_resolver' => $this->skuOptionImageResolver,
+                        'sku_placement_resolver' => $this->skuPlacementResolver,
+                        'logo_lookup_resolver' => $this->logoLookupResolver,
+                        'color_translation_resolver' => $this->colorTranslationResolver,
                     ]
                 );
 
@@ -244,6 +256,9 @@ class DataProcessingService
                 ], [
                     'color_lookup' => $colorLookup,
                     'sku_option_image_resolver' => $this->skuOptionImageResolver,
+                    'sku_placement_resolver' => $this->skuPlacementResolver,
+                    'logo_lookup_resolver' => $this->logoLookupResolver,
+                    'color_translation_resolver' => $this->colorTranslationResolver,
                 ]);
 
                 for ($column = 0; $column < count($headers); $column++) {
@@ -1019,6 +1034,11 @@ class DataProcessingService
     {
         $value = trim((string) $value);
 
+        if ($this->isStandaloneNoThanksImageReference($value)) {
+            $sheet->setCellValueByColumnAndRow($column, $row, '');
+            return;
+        }
+
         if ($embeddedImagePath !== null && file_exists($embeddedImagePath)) {
             $imagePath = $this->prepareImageForExcel($embeddedImagePath, $imageTempFiles);
 
@@ -1119,7 +1139,7 @@ class DataProcessingService
             return false;
         }
 
-        return true;
+        return !$this->isNoThanksImageReference($value);
     }
 
     private function isImageFilePath($value)
@@ -1128,7 +1148,36 @@ class DataProcessingService
             return false;
         }
 
+        if ($this->isNoThanksImageReference($value)) {
+            return false;
+        }
+
         return file_exists($value) && @getimagesize($value) !== false;
+    }
+
+    private function isNoThanksImageReference($value)
+    {
+        $value = strtolower(trim((string) $value));
+
+        return strpos($value, 'no-thanks') !== false
+            || strpos($value, 'no_thanks') !== false
+            || strpos($value, 'no thanks') !== false
+            || strpos($value, 'no-thank') !== false
+            || strpos($value, 'no_thank') !== false
+            || strpos($value, 'no thank') !== false;
+    }
+
+    private function isStandaloneNoThanksImageReference($value)
+    {
+        $value = trim((string) $value);
+
+        if (!$this->isNoThanksImageReference($value)) {
+            return false;
+        }
+
+        return preg_match('/^https?:\/\//i', $value)
+            || preg_match('/\.(png|jpe?g|gif|webp)$/i', $value)
+            || file_exists($value);
     }
 
     private function extractImageReferences($value)
@@ -1157,6 +1206,10 @@ class DataProcessingService
             if (strpos($line, '：') !== false) {
                 $parts = explode('：', $line, 2);
                 $candidates[] = trim($parts[1]);
+            }
+
+            if (preg_match('/^.+?:\s*([A-Za-z]:[\/\\\\].+)$/', $line, $matches)) {
+                $candidates[] = trim($matches[1]);
             }
 
             foreach ($candidates as $candidate) {
@@ -1243,6 +1296,14 @@ class DataProcessingService
         $currentExtension = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
         $allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp'];
 
+        if ($imageInfo[2] === IMAGETYPE_JPEG) {
+            $normalizedPath = $this->normalizeJpegOrientationForExcel($sourcePath, $imageTempFiles);
+
+            if ($normalizedPath !== null) {
+                return $normalizedPath;
+            }
+        }
+
         if (in_array($currentExtension, $allowedExtensions, true)) {
             return $sourcePath;
         }
@@ -1261,6 +1322,192 @@ class DataProcessingService
         $imageTempFiles['paths'][] = $path;
 
         return $path;
+    }
+
+    private function normalizeJpegOrientationForExcel($sourcePath, array &$imageTempFiles)
+    {
+        $orientation = $this->readJpegExifOrientation($sourcePath);
+
+        if ($orientation <= 1) {
+            return null;
+        }
+
+        if (!function_exists('imagecreatefromjpeg') || !function_exists('imagejpeg')) {
+            return null;
+        }
+
+        $image = @imagecreatefromjpeg($sourcePath);
+
+        if ($image === false) {
+            return null;
+        }
+
+        $normalized = $this->applyExifOrientationToImage($image, $orientation);
+
+        if ($normalized === false) {
+            imagedestroy($image);
+            return null;
+        }
+
+        if ($normalized !== $image) {
+            imagedestroy($image);
+            $image = $normalized;
+        }
+
+        $directory = storage_path('app/temp/export_images');
+        $this->ensureDirectory($directory);
+        $path = $directory . DIRECTORY_SEPARATOR . sha1($sourcePath . $orientation . microtime(true)) . '.jpg';
+
+        if (!imagejpeg($image, $path, 92)) {
+            imagedestroy($image);
+            return null;
+        }
+
+        imagedestroy($image);
+        $imageTempFiles['paths'][] = $path;
+
+        return $path;
+    }
+
+    private function applyExifOrientationToImage($image, $orientation)
+    {
+        switch ((int) $orientation) {
+            case 2:
+                imageflip($image, IMG_FLIP_HORIZONTAL);
+                return $image;
+            case 3:
+                return imagerotate($image, 180, 0);
+            case 4:
+                imageflip($image, IMG_FLIP_VERTICAL);
+                return $image;
+            case 5:
+                imageflip($image, IMG_FLIP_HORIZONTAL);
+                return imagerotate($image, -90, 0);
+            case 6:
+                return imagerotate($image, -90, 0);
+            case 7:
+                imageflip($image, IMG_FLIP_HORIZONTAL);
+                return imagerotate($image, 90, 0);
+            case 8:
+                return imagerotate($image, 90, 0);
+            default:
+                return $image;
+        }
+    }
+
+    private function readJpegExifOrientation($sourcePath)
+    {
+        $bytes = @file_get_contents($sourcePath, false, null, 0, 65536);
+
+        if (!is_string($bytes) || substr($bytes, 0, 2) !== "\xFF\xD8") {
+            return 1;
+        }
+
+        $offset = 2;
+        $length = strlen($bytes);
+
+        while ($offset + 4 <= $length) {
+            if (ord($bytes[$offset]) !== 0xFF) {
+                break;
+            }
+
+            while ($offset < $length && ord($bytes[$offset]) === 0xFF) {
+                $offset++;
+            }
+
+            if ($offset >= $length) {
+                break;
+            }
+
+            $marker = ord($bytes[$offset]);
+            $offset++;
+
+            if ($marker === 0xDA || $marker === 0xD9) {
+                break;
+            }
+
+            if ($offset + 2 > $length) {
+                break;
+            }
+
+            $segmentLength = unpack('n', substr($bytes, $offset, 2))[1];
+            $segmentStart = $offset + 2;
+            $payloadLength = $segmentLength - 2;
+
+            if ($payloadLength <= 0 || $segmentStart + $payloadLength > $length) {
+                break;
+            }
+
+            if ($marker === 0xE1) {
+                $orientation = $this->readExifOrientationFromApp1Segment(substr($bytes, $segmentStart, $payloadLength));
+
+                if ($orientation > 0) {
+                    return $orientation;
+                }
+            }
+
+            $offset += $segmentLength;
+        }
+
+        return 1;
+    }
+
+    private function readExifOrientationFromApp1Segment($segment)
+    {
+        if (substr($segment, 0, 6) !== "Exif\0\0") {
+            return 0;
+        }
+
+        $tiff = substr($segment, 6);
+        $endian = substr($tiff, 0, 2);
+
+        if ($endian === 'II') {
+            $shortFormat = 'v';
+            $longFormat = 'V';
+        } elseif ($endian === 'MM') {
+            $shortFormat = 'n';
+            $longFormat = 'N';
+        } else {
+            return 0;
+        }
+
+        if (strlen($tiff) < 14 || $this->unpackValue($shortFormat, substr($tiff, 2, 2)) !== 42) {
+            return 0;
+        }
+
+        $ifdOffset = $this->unpackValue($longFormat, substr($tiff, 4, 4));
+
+        if ($ifdOffset < 8 || $ifdOffset + 2 > strlen($tiff)) {
+            return 0;
+        }
+
+        $entryCount = $this->unpackValue($shortFormat, substr($tiff, $ifdOffset, 2));
+        $entryOffset = $ifdOffset + 2;
+
+        for ($index = 0; $index < $entryCount; $index++) {
+            $currentOffset = $entryOffset + ($index * 12);
+
+            if ($currentOffset + 12 > strlen($tiff)) {
+                break;
+            }
+
+            $tag = $this->unpackValue($shortFormat, substr($tiff, $currentOffset, 2));
+
+            if ($tag !== 0x0112) {
+                continue;
+            }
+
+            return $this->unpackValue($shortFormat, substr($tiff, $currentOffset + 8, 2));
+        }
+
+        return 0;
+    }
+
+    private function unpackValue($format, $bytes)
+    {
+        $values = unpack($format, $bytes);
+
+        return (int) $values[1];
     }
 
     private function fetchUrlBytes($url)
@@ -1396,7 +1643,7 @@ class DataProcessingService
             return true;
         }
 
-        foreach (['图片', '图标', '字体', '设计稿', '主图', '款图', '款式图', '产品图', '订单图片'] as $needle) {
+        foreach (['图片', '图标', '符号', '字体', '设计稿', '设计风格', '主图', '款图', '款式图', '产品图', '订单图片', '贺卡', '礼品', '包装', 'logo', 'Logo', 'LOGO'] as $needle) {
             if (strpos($header, $needle) !== false) {
                 return true;
             }

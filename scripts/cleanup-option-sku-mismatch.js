@@ -57,6 +57,9 @@ function main() {
   const options = before.options || [];
   const productsById = new Map(products.map((product) => [Number(product.id), product]));
   const finalReferencedPaths = new Set();
+  const initiallyReferencedPaths = new Set(
+    options.map((option) => String(option.image_path || '')).filter((imagePath) => imagePath !== '')
+  );
   const mismatches = [];
   const renamePlans = new Map();
 
@@ -130,7 +133,7 @@ function main() {
     if (fs.existsSync(newAbsolutePath)) {
       reusedExistingTargets += 1;
 
-      if (!finalReferencedPaths.has(oldImagePath)) {
+      if (!finalReferencedPaths.has(oldImagePath) && !initiallyReferencedPaths.has(oldImagePath)) {
         fs.unlinkSync(oldAbsolutePath);
         deletedOldImages += 1;
       }
@@ -140,7 +143,7 @@ function main() {
     }
 
     fs.mkdirSync(path.dirname(newAbsolutePath), { recursive: true });
-    fs.renameSync(oldAbsolutePath, newAbsolutePath);
+    fs.copyFileSync(oldAbsolutePath, newAbsolutePath);
     renamedImages += 1;
   }
 

@@ -30,4 +30,12 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'color_translation' => [
+        'enabled' => env('COLOR_TRANSLATION_ENABLED', true),
+        'endpoint' => env('COLOR_TRANSLATION_ENDPOINT', 'https://api.mymemory.translated.net/get'),
+        'timeout' => env('COLOR_TRANSLATION_TIMEOUT', 5),
+        'email' => env('COLOR_TRANSLATION_EMAIL', ''),
+        'cache_path' => storage_path('app/private/lookups/translation-cache.json'),
+    ],
+
 ];

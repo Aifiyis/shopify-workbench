@@ -1,269 +1,333 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Project-specific guidance for agents working in this repository.
+
+This file is intentionally operational. Follow it before running commands, changing data, or declaring work complete.
 
 ## Project Overview
 
-**Shopify Internal Management Workbench** - A Laravel 8 application for managing multiple Shopify stores, syncing orders, transforming data fields (Ruby-to-PHP translation), and exporting orders to Excel format.
+**Shopify Internal Management Workbench** is a Laravel 8 application for internal Shopify operations.
 
-### Core Stack
+Primary responsibilities:
+- Admin login and role-based access.
+- Shopify store/order access and export.
+- Order field transformation and Excel generation.
+- SKU cleaning and product type lookup.
+- Dynamic SKU option image scraping through a Laravel command plus a Node/Playwright worker.
 
-- **Framework**: Laravel 8
-- **Database**: MySQL 5.7+
-- **Key Libraries**: Shopify API (guzzlehttp), Maatwebsite/Excel (PHPExcel)
-- **Authentication**: Laravel Session Guard for Admin users
-- **Frontend**: Blade templates with vanilla JS
+## Core Stack
 
-## Common Development Tasks
+- Framework: Laravel 8
+- PHP compatibility: PHP 7.3+ / PHP 8.x as allowed by `composer.json`
+- Frontend: Blade templates with vanilla JavaScript and Tailwind CDN in layouts
+- Database: SQLite in local `.env`; MySQL-compatible schema in production-oriented docs
+- Excel: PHPExcel through `maatwebsite/excel ^1.1`
+- HTTP/API: Guzzle and Shopify API library
+- Dynamic page scraping: Laravel orchestration plus Node.js Playwright worker
 
-### Running the Application
+## Non-Negotiable Database Safety
+
+This project previously lost local admin accounts because `php artisan test` ran while PHPUnit was not isolated. A test used `migrate:fresh`, which rebuilt `database/database.sqlite`.
+
+Before running any test, migration, seed, import, or destructive command:
+- Check the active database target.
+- Treat `database/database.sqlite` as user data.
+- Treat `admins`, stores, orders, order line items, SKU lookup files, and scraper outputs as user data.
+- Do not run `php artisan migrate:fresh`, `php artisan migrate:refresh`, raw `DROP`, raw `TRUNCATE`, or any equivalent destructive command unless the user explicitly asks to rebuild that exact database.
+- If a destructive database command is genuinely needed, first state the target database, expected impact, backup or restore plan, and wait for explicit approval.
+
+For tests, `phpunit.xml` must keep this isolation:
+
+```xml
+<server name="DB_CONNECTION" value="sqlite"/>
+<server name="DB_DATABASE" value=":memory:"/>
+```
+
+If those lines are missing, commented out, or overridden by environment variables, stop and fix the test database configuration before running `php artisan test`.
+
+## Common Commands
+
+### Run the Application
 
 ```bash
-# Start development server
 php artisan serve
-
-# Run migrations
-php artisan migrate
-
-# Access the app at http://localhost:8000/login
 ```
 
-### Running Tests
+The local app is commonly accessed at:
+
+```text
+http://localhost:8001/login
+```
+
+Check the active server/port before assuming a URL.
+
+### Run Tests
+
+Before running tests, verify PHPUnit still uses an isolated database:
 
 ```bash
-# Run all tests (when implemented)
-php artisan test
-
-# Run specific test
-php artisan test tests/Unit/Services/Transformers/ExtraTransformerTest.php
+php -r "echo file_get_contents('phpunit.xml');"
 ```
+
+Preferred narrow test runs:
+
+```bash
+php artisan test --filter=Sku
+php artisan test tests/Unit/SkuOptionScrapeServiceTest.php
+npm.cmd run test:sku-options-worker
+```
+
+Only run the full suite after confirming the database isolation above:
+
+```bash
+php artisan test
+```
+
+If a full suite has unrelated existing failures, report them separately and do not claim the whole suite passes.
 
 ### Database Operations
 
+Safe schema-forward migration when requested:
+
 ```bash
-# Create new migration
-php artisan make:migration create_table_name
+php artisan migrate
+```
 
-# Rollback migrations
-php artisan migrate:rollback
+Dangerous commands requiring explicit user approval:
 
-# Fresh database
+```bash
 php artisan migrate:fresh
+php artisan migrate:refresh
+php artisan db:seed
 ```
 
-### Debugging
+Do not use these as casual verification commands.
+
+### Logs
+
+Laravel application log:
+
+```text
+storage/logs/laravel.log
+```
+
+SKU option scraper batch run logs:
+
+```text
+storage/logs/sku-options-scrape-run.log
+storage/logs/sku-options-scrape-run.err.log
+```
+
+## Important Data Paths
+
+Private business data lives under:
+
+```text
+storage/app/private/
+```
+
+Important files and directories:
+- `storage/app/private/sku-cleaned.json`
+- `storage/app/private/sku-exclude-values.json`
+- `storage/app/private/all-sku-to-product_type.json`
+- `storage/app/private/sku-option-links.txt`
+- `storage/app/private/sku-options-image.json`
+- `storage/app/private/sku-options-image/`
+
+Do not delete, overwrite, regenerate, or bulk-clean these files unless the user requested that exact operation.
+
+### Editing JSON Files With Chinese Text
+
+Several business JSON files contain Chinese keys and values, especially:
+- `storage/app/private/sku-cleaned.json`
+- `storage/app/private/sku-options-image.json`
+- `storage/app/private/lookups/sku-placement-rules.json`
+
+When scripting updates to these files on Windows/PowerShell:
+- Do not rely on PowerShell pipes, here-strings, or inline command text to carry Chinese string literals.
+- Prefer reading/writing JSON through PHP or another structured parser using UTF-8.
+- When the script itself is passed through PowerShell, construct Chinese string constants from pure ASCII Unicode escapes, for example:
+
+```php
+$category = json_decode('"\\u6b3e\\u5f0f\\u56fe\\u70eb\\u753b"', true); // 款式图烫画
+$position = json_decode('"\\u5de6\\u80f8\\u548c\\u540e\\u80cc"', true); // 左胸和后背
+$chineseNameKey = json_decode('"\\u4e2d\\u6587\\u540d\\u79f0"', true); // 中文名称
+```
+
+After any scripted JSON update:
+- Run `json_decode` checks on every modified JSON file.
+- Re-read representative target records and confirm Chinese fields are correct.
+- Search for accidental replacement fields or values such as `????`.
+- If a bad key such as `????` was introduced, remove it from the affected records before reporting completion.
+
+Generated temporary files belong under:
+
+```text
+storage/app/temp/
+```
+
+Processed downloadable files commonly live under:
+
+```text
+storage/app/public/processed_files/
+```
+
+## Architecture Notes
+
+### Authentication
+
+- Model: `App\Models\Admin`
+- Guard: `admin`
+- Login controller: `app/Http/Controllers/Auth/AdminLoginController.php`
+- Admin table is `admins`, not Laravel's default `users`.
+
+Default restored local login, when needed:
+
+```text
+email: admin@example.com
+password: password123
+role: super
+```
+
+Do not reset or recreate admin accounts unless the user asks or login recovery is explicitly needed.
+
+### Order and Export Flow
+
+Core services:
+- `ShopifyService` fetches Shopify orders.
+- `OrderCacheService` caches store orders locally.
+- `OrderFieldTransformer` coordinates field transformers.
+- `ExcelExportService` writes XLSX exports.
+- `DataProcessingService` handles uploaded order files and generated archives.
+
+Transformer classes live in:
+
+```text
+app/Services/Transformers/
+```
+
+Keep transformation changes narrow and covered by focused tests.
+
+### SKU Cleaning
+
+SKU cleaning uses:
+- `SkuCleaningService`
+- `storage/app/private/sku-cleaned.json`
+- `storage/app/private/sku-exclude-values.json`
+
+Resolution order:
+- Match `original_sku` in `sku-cleaned.json`.
+- If not found, clean using exclude values.
+- Match cleaned SKU back to `sku-cleaned.json` for `中文名称`.
+
+`excel_category` and `type` both use the matched `中文名称`.
+
+### SKU Option Image Scraping
+
+Command:
 
 ```bash
-# Interactive shell (tinker)
-php artisan tinker
-
-# Check logs
-tail -f storage/logs/laravel.log
+php artisan sku-options:scrape storage/app/private/sku-option-links.txt --timeout=120
 ```
 
-## Architecture & Key Files
+Responsibilities:
+- Laravel command reads URLs, invokes the worker, downloads images, writes JSON, and logs errors.
+- Node/Playwright worker opens dynamic product pages and extracts plugin-specific option data.
+- YMQ is implemented.
+- Customily is detected and reported as unsupported until a specific extractor is added.
 
-### Authentication Layer
-- **File**: `app/Http/Controllers/Auth/AdminLoginController.php`
-- **Guard**: `admin` (uses `admins` table, not `users`)
-- **Config**: `config/auth.php` - defines admin provider and guard
+Output:
 
-### Data Transformation (Core Logic)
-The project translates 6 Ruby methods into PHP Transformer classes:
-
-1. **NameTransformer** (`app/Services/Transformers/NameTransformer.php`)
-   - Ruby: Concatenates all line_item titles
-   - Use: Extract product names from order
-
-2. **ValTransformer** (`app/Services/Transformers/ValTransformer.php`)
-   - Ruby: Checks if title contains "3,99", returns "H"
-   - Use: Mark special price products
-
-3. **UrlTransformer** (`app/Services/Transformers/UrlTransformer.php`)
-   - Ruby: Extracts picture URL from line_item.properties where name="picture"
-   - Use: Get product image URL
-
-4. **SubpicTransformer** (`app/Services/Transformers/SubpicTransformer.php`)
-   - Ruby: Extracts filename from URL (everything after last "/")
-   - Use: Get filename from URL
-
-5. **ExtraTransformer** (`app/Services/Transformers/ExtraTransformer.php`) - **Most Complex**
-   - Ruby: 40+ if-elsif conditions generating filename based on color/size/type
-   - Use: Generate standardized filenames for manufacturing
-   - Methods: `normalizeTag()`, `normalizeColor()`, `normalizeSize()`, `normalizePjSize()`, `generateFilename()`
-
-6. **GetnotesTransformer** (`app/Services/Transformers/GetnotesTransformer.php`)
-   - Ruby: Extracts notes from line_item.properties where name="notes"
-   - Use: Get custom user notes
-
-**Entry Point**: `OrderFieldTransformer` (`app/Services/OrderFieldTransformer.php`) - orchestrates all transformers
-
-### Service Layer
-
-- **ShopifyService** (`app/Services/ShopifyService.php`)
-  - Method: `fetchOrders($store, $startDate, $endDate)` - calls Shopify REST API
-  - Method: `callApi()` - generic API caller with auth token
-  - Uses: Guzzle HTTP client
-
-- **OrderCacheService** (`app/Services/OrderCacheService.php`)
-  - Method: `cacheOrders($orders, $store)` - saves to DB with TTL
-  - Method: `getCachedOrders($store, $filters)` - retrieves from cache
-  - Method: `isCacheValid($store)` - checks if cache expired
-  - Cache TTL: 1 hour (configurable via `setCacheTtl()`)
-
-- **ExcelExportService** (`app/Services/ExcelExportService.php`)
-  - Method: `export($orders, $startDate, $endDate)` - generates XLSX
-  - File location: `storage/exports/{filename}.xlsx`
-  - Columns: Matches `de_order_with_image_0203230600.xlsx` structure
-  - Library: PHPExcel (via Maatwebsite/Excel v1.1.5)
-
-### Controllers
-
-- **AdminLoginController** - Authentication (login/logout)
-- **DashboardController** - Store selection screen
-- **OrderController** - Order list, refresh, export (main business logic)
-- **ExportController** - File download handler
-
-### Models
-
-All models use relationship methods:
-- `Admin::stores()` - many-to-many via `admin_store_access`
-- `ShopifyStore::orders()` - one-to-many
-- `Order::lineItems()` - one-to-many
-- Key method: `Admin::canAccessStore($storeId)` - permission check
-
-### Database Schema
-
-**admins** - id, name, email, password, role (super/manager), is_active, last_login
-
-**shopify_stores** - id, shop_name, shop_url, access_token, is_active, last_synced_at
-
-**admin_store_access** - id, admin_id (FK), store_id (FK), access_level (view/edit)
-
-**orders** - id, store_id (FK), shopify_order_id, order_date, order_name, customer_name, total_price, currency, status, line_items_count, cached_at, expires_at
-
-**order_line_items** - id, order_id (FK), shopify_line_item_id, product_title, product_type, quantity, option1, option3, product_tags, sku, multi_types, picture_url, pic_name, extra_details, custom_text, raw_properties (JSON)
-
-## Important Design Decisions
-
-### Why Excel v1 (PHPExcel)?
-- Laravel 8 compatibility constraint (older PHP 7.4)
-- Newer versions require PHP 8.1+
-- If upgrading to PHP 8.1+, migrate to `maatwebsite/excel ^3.1`
-
-### Why separate Transformer classes?
-- Each Ruby rule = 1 testable unit
-- Easy to modify individual rules without touching others
-- Clear responsibility separation
-
-### Why local database cache?
-- Reduce Shopify API rate limit hits
-- Faster order listing
-- Offline access to recent data
-- Historical tracking
-
-### Permission Model
-- **Super admin**: All stores automatically
-- **Manager**: Only assigned stores
-- Check: `Auth::guard('admin')->user()->canAccessStore($storeId)`
-
-## Code Style Conventions
-
-- **Comments**: Only on complex logic (ExtraTransformer rules, data mappings)
-- **Naming**: Descriptive class/method names (e.g., `normalizeColor()` not `nc()`)
-- **Error Handling**: Try-catch in Transformers returns "ERROR: {message}" (allows export to continue)
-- **Logging**: Use `\Log::error()` for API failures
-- **Validation**: Request class validation via `Request::validate()`
-
-## Common Modifications
-
-### Adding a new Transformer Rule
-
-1. Create `app/Services/Transformers/RuleTransformer.php`
-2. Implement `transform()` method with try-catch
-3. Register in `OrderFieldTransformer::__construct()`
-4. Add to `transformLineItem()` method
-
-### Extending Excel Export Columns
-
-1. Edit `ExcelExportService::$columns` array
-2. Update `writeOrderLine()` to add new data
-3. Adjust `adjustColumnWidths()` if needed
-
-### Modifying Cache TTL
-
-In `OrderCacheService::__construct()`:
-```php
-$this->cacheTtlHours = 4; // Change from 1 to 4 hours
-// Or via method: $service->setCacheTtl(4);
+```text
+storage/app/private/sku-options-image.json
+storage/app/private/sku-options-image/
 ```
 
-### Adding New Admin Permission
+Current image naming rule:
 
-```php
-// Add in database/seeders or via tinker
-AdminStoreAccess::create([
-    'admin_id' => $adminId,
-    'store_id' => $storeId,
-    'access_level' => 'edit', // or 'view'
-]);
+```text
+{cleaned_sku}_{option_value}.{extension}
 ```
 
-## API Response Format
+Do not include option name in downloaded image filenames. If the target filename already exists, skip downloading that image again.
 
-### Success Response
-```json
-{
-  "success": true,
-  "message": "Operation completed",
-  "data": { ... }
-}
+`options.sort_order` preserves the original scrape order from the product page.
+
+When running large batches:
+- Use a background process for long runs.
+- Redirect stdout/stderr to named log files.
+- Errors from failed products, unsupported plugins, unknown pages, and image downloads should go to `storage/logs/laravel.log`.
+- Report PID, log paths, JSON path, and image directory.
+
+If Playwright cannot find its bundled browser, the worker supports:
+
+```powershell
+$env:PLAYWRIGHT_CHROMIUM_EXECUTABLE='C:\Program Files\Google\Chrome\Application\chrome.exe'
 ```
 
-### Error Response
-```json
-{
-  "success": false,
-  "message": "Error description"
-}
+In this environment, `NODE_PATH` may be needed for the bundled runtime:
+
+```powershell
+$env:NODE_PATH='C:\Users\20111\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\node_modules\.pnpm\node_modules'
 ```
+
+## Coding Guidelines
+
+- Keep edits closely scoped to the user's request.
+- Prefer existing Laravel service/controller patterns.
+- Use dependency injection for services when practical.
+- Keep controller logic thin; put business logic in services.
+- Use `\Log` or `Illuminate\Support\Facades\Log` for operational failures.
+- Avoid broad refactors while feature work is in progress.
+- Do not touch dirty files unrelated to the task.
+
+## Verification Guidelines
+
+Before claiming completion:
+- Run the narrowest relevant tests.
+- Verify generated files exist when the task creates files.
+- Verify counts and representative records for JSON/image outputs.
+- If full verification is blocked by network, permissions, or existing unrelated failures, state that plainly.
+
+Do not say "tests pass" unless the exact test command passed in the current run.
+
+For frontend-visible changes, use the browser or HTTP checks when a local server is available.
+
+For scraper work, useful checks include:
+
+```bash
+php artisan test --filter=Sku
+npm.cmd run test:sku-options-worker
+node --check scripts/sku-options-scraper.js
+```
+
+For database-sensitive work, never use a broad test command until PHPUnit isolation is confirmed.
+
+## Dependency Notes
+
+- Do not upgrade `maatwebsite/excel` to v3 without planning a PHP upgrade; this project uses the PHPExcel-era package.
+- `node_modules` may be a junction in Codex environments. Do not assume it is a normal project-local dependency directory.
+- If npm writes a project-local cache, keep `.npm-cache` ignored.
 
 ## Troubleshooting
 
-**Q: Orders not showing up after refresh?**
-- Check Shopify access_token is valid
-- Check logs: `storage/logs/laravel.log`
-- Verify store has orders in selected date range
+Login fails:
+- Confirm `admins` contains an active admin.
+- Confirm password hash with a non-mutating read or a targeted recovery step.
+- Do not run migrations or seeders as a login fix unless explicitly approved.
 
-**Q: Excel export fails?**
-- Check `storage/exports/` exists and is writable
-- Check PHPExcel version compatibility (v1 for PHP 7.4)
+Scraper produces no options:
+- Check `sku-options-image.json` product `plugin`, `status`, and `error`.
+- `unknown` usually means the page failed to load or no supported plugin was detected.
+- Network sandbox failures may appear as `ERR_NETWORK_ACCESS_DENIED`.
+- Check `storage/logs/laravel.log` for product and image-level warnings.
 
-**Q: Permission denied on orders?**
-- Check `admin_store_access` record exists
-- Verify admin role (super admin bypasses check)
+Excel export fails:
+- Check writable output directories.
+- Check source workbook formulas/images.
+- Keep image temp files under `storage/app/temp/`.
 
-**Q: Transformers returning "ERROR:"?**
-- Each transformer is wrapped in try-catch and returns error message
-- Check Shopify API response format (properties, line_items structure)
-
-## Next Steps / TODOs
-
-- [ ] Implement Shopify OAuth flow (currently manual token input)
-- [ ] Add store management UI
-- [ ] Implement scheduled synchronization jobs
-- [ ] Add search and advanced filtering
-- [ ] Implement batch operations
-- [ ] Add audit logging
-- [ ] Performance: Add pagination for large order lists
-- [ ] Consider migrating to Laravel 11 + PHP 8.2+ for newer packages
-
-## Dependencies Versions
-
-- `laravel/framework: ^8.83`
-- `shopify/shopify-api: ^1.0` (PHP 7.4 compatible version)
-- `maatwebsite/excel: ^1.1` (PHPExcel wrapper, not the newer v3)
-- `guzzlehttp/guzzle: ^7.10`
-
-Do NOT upgrade to Excel v3 without upgrading PHP to 8.1+.
-
+Orders not showing:
+- Check Shopify token and store access.
+- Check cache TTL and `OrderCacheService`.
+- Check `storage/logs/laravel.log`.

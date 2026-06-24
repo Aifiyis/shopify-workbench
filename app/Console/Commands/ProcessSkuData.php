@@ -601,6 +601,7 @@ class ProcessSkuData extends Command
             'WW24090702',
             'QK5333',
             'WYJ6326',
+            'QK2844',
             '6316',
             '6317'
         ];

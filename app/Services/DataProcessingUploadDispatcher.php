@@ -27,6 +27,7 @@ class DataProcessingUploadDispatcher
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             $innerCommand = 'start /B "" '
                 . escapeshellarg($phpBinary) . ' '
+                . '-d memory_limit=1024M '
                 . escapeshellarg($artisan) . ' '
                 . 'data-processing:process-upload '
                 . (int) $processedFileId
@@ -36,6 +37,7 @@ class DataProcessingUploadDispatcher
         }
 
         return escapeshellarg($phpBinary) . ' '
+            . '-d memory_limit=1024M '
             . escapeshellarg($artisan) . ' '
             . 'data-processing:process-upload '
             . (int) $processedFileId

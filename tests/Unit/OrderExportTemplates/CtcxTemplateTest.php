@@ -164,7 +164,135 @@ class CtcxTemplateTest extends TestCase
         ]);
 
         $this->assertSame("第一行：ABC\n第二行：Real second line\n第三行：Real third line", $this->valueForHeader($template, $row, '胸部信息'));
-        $this->assertSame("第一行：\n第二行：银色\n第三行：金色", $this->valueForHeader($template, $row, '胸部信息颜色'));
+        $this->assertSame("第二行：银色\n第三行：金色", $this->valueForHeader($template, $row, '胸部信息颜色'));
+    }
+
+    public function test_option_name_rules_omit_empty_chest_info_lines()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-5',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK9999-CX-002',
+            'cleaned_sku' => 'CS-QK9999-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'Add 2nd Line Text: Real second line',
+                'Color for 3rd Line: Gold',
+            ]),
+        ], [
+            'color_lookup' => [
+                'Gold' => '金色',
+            ],
+        ]);
+
+        $this->assertSame('第二行：Real second line', $this->valueForHeader($template, $row, '胸部信息'));
+        $this->assertSame('第三行：金色', $this->valueForHeader($template, $row, '胸部信息颜色'));
+    }
+
+    public function test_line_color_options_are_case_insensitive_and_do_not_fill_sleeve_thread_color()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-6',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK9999-CX-003',
+            'cleaned_sku' => 'CS-QK9999-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'Color For Initials: White',
+                'Color for 2nd line: Silver',
+                'Color for 3rd Line: Gold',
+            ]),
+        ], [
+            'color_lookup' => [
+                'White' => '白色',
+                'Silver' => '银色',
+                'Gold' => '金色',
+            ],
+        ]);
+
+        $this->assertSame("第一行：白色\n第二行：银色\n第三行：金色", $this->valueForHeader($template, $row, '胸部信息颜色'));
+        $this->assertSame('', $this->valueForHeader($template, $row, '袖子绣线颜色'));
+    }
+
+    public function test_thread_color_line_options_map_to_chest_info_color_not_sleeve_thread_color()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-6B',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK9999-CX-004',
+            'cleaned_sku' => 'CS-QK9999-CX',
+            'product_specs' => implode("\n", [
+                'Variants: Crewneck',
+                'Adult Unisex Size: XL',
+                'Choose Crewneck Color: Gray',
+                'School Initials: OWU',
+                'Thread Color for Initials(Multiple options, 3 max): White, Black, Red',
+                'Add 2nd line & 3rd line text: 2nd (+$1.99)',
+                'Add 2nd Line Text: Ohio Wesleyan University',
+                '2nd Line Font: F5',
+                'Thread Color for 2nd Line: Red',
+            ]),
+        ], [
+            'color_lookup' => [
+                'White' => 'White CN',
+                'Black' => 'Black CN',
+                'Red' => 'Red CN',
+            ],
+        ]);
+
+        $this->assertStringContainsString('White CN, Black CN, Red CN', $row[20]);
+        $this->assertStringContainsString('Red CN', $row[20]);
+        $this->assertSame('', $row[18]);
+    }
+
+    public function test_defaults_chest_position_to_center_when_specs_and_sku_have_no_position()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-7',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK9999-CX-004',
+            'cleaned_sku' => 'CS-QK9999-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'School Initials: ABC',
+            ]),
+        ], []);
+
+        $this->assertSame('胸部中央', $this->valueForHeader($template, $row, '胸部位置'));
     }
 
     private function valueForHeader($template, array $row, $header)

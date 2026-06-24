@@ -22,8 +22,10 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
     public function mapRow(array $row, array $context)
     {
         $values = $this->applyCommonOptionRules($this->baseValues($row), $row, $context);
+        $values = $this->applyRules($values, $row, $context);
+        $this->applySleevePositionColumnRules($values);
 
-        return $this->applyRules($values, $row, $context);
+        return $values;
     }
 
     protected function baseValues(array $row)
@@ -64,9 +66,15 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         $attributes = $this->attributesAfter($row['product_specs'] ?? '', 0);
         $previousAttribute = null;
         $hasSleeveOption = $this->hasSleeveOption($attributes);
+        $hasBodyPositionOption = false;
         $defaultLeftSleeveNameLines = [];
 
-        $this->setGarmentColorFromFirstThreeAttributes($values, $attributes, $context['color_lookup'] ?? []);
+        $this->setGarmentColorFromFirstThreeAttributes(
+            $values,
+            $attributes,
+            $context['color_lookup'] ?? [],
+            $context['color_translation_resolver'] ?? null
+        );
 
         foreach ($attributes as $attribute) {
             $name = trim((string) ($attribute['name'] ?? ''));
@@ -78,7 +86,14 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 continue;
             }
 
-            if (strpos($lowerName, 'nickname') !== false) {
+            if ($this->isBodyPositionOptionName($lowerName)) {
+                $this->setFirstHeaderValueIfBlank($values, $this->positionHeaders(), $this->mapEmbroideryPosition($value));
+                $hasBodyPositionOption = true;
+                $previousAttribute = $attribute;
+                continue;
+            }
+
+            if (strpos($lowerName, 'nickname') !== false && !$this->shouldSkipNicknameOption($lowerName, $value)) {
                 $this->appendFirstHeaderValue($values, ['胸口信息文本', '胸口信息', '胸部信息'], $value);
                 $previousAttribute = $attribute;
                 continue;
@@ -101,12 +116,13 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 $defaultLeftSleeveNameLines[] = $this->formatNameLineValue($name, $value, $lineNumber);
             }
 
-            if (strpos($lowerName, 'name') !== false || strpos($lowerName, 'text') !== false) {
+            if ((strpos($lowerName, 'name') !== false || strpos($lowerName, 'text') !== false)
+                && !$this->isIgnoredPlaceholderValue($value)) {
                 if (strpos($lowerName, 'left sleeve') !== false) {
                     $this->setFirstHeaderValueIfBlank($values, ['左袖信息', '左袖文本'], $value);
                 } elseif (strpos($lowerName, 'right sleeve') !== false) {
                     $this->setFirstHeaderValueIfBlank($values, ['右袖信息', '右袖文本'], $value);
-                } elseif (strpos($lowerName, 'collar') !== false) {
+                } elseif (strpos($lowerName, 'collar') !== false || strpos($lowerName, 'neckline')) {
                     $this->setFirstHeaderValueIfBlank($values, ['领口信息'], $value);
                 }
             }
@@ -129,18 +145,41 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 }
             }
 
-            if (strpos($lowerName, 'color') !== false) {
-                $translatedColor = $this->translateOptionColorValue($value, $context['color_lookup'] ?? []);
-
+            if (strpos($lowerName, 'color') !== false && !$this->shouldSkipCommonColorRule($lowerName)) {
                 if (strpos($lowerName, 'left sleeve') !== false) {
+                    $translatedColor = $this->translateOptionColorValue(
+                        $value,
+                        $context['color_lookup'] ?? [],
+                        $context['color_translation_resolver'] ?? null
+                    );
                     $this->setFirstHeaderValueIfBlank($values, ['左袖线色', '左袖绣线颜色'], $translatedColor);
                 } elseif (strpos($lowerName, 'right sleeve') !== false) {
+                    $translatedColor = $this->translateOptionColorValue(
+                        $value,
+                        $context['color_lookup'] ?? [],
+                        $context['color_translation_resolver'] ?? null
+                    );
                     $this->setFirstHeaderValueIfBlank($values, ['右袖线色', '右袖绣线颜色'], $translatedColor);
                 } elseif (strpos($lowerName, 'collar') !== false) {
+                    $translatedColor = $this->translateOptionColorValue(
+                        $value,
+                        $context['color_lookup'] ?? [],
+                        $context['color_translation_resolver'] ?? null
+                    );
                     $this->setFirstHeaderValueIfBlank($values, ['领口文本颜色'], $translatedColor);
                 } elseif (strpos($lowerName, 'sleeve') !== false || strpos($lowerName, 'thread') !== false) {
+                    $translatedColor = $this->translateOptionColorValue(
+                        $value,
+                        $context['color_lookup'] ?? [],
+                        $context['color_translation_resolver'] ?? null
+                    );
                     $this->setFirstHeaderValueIfBlank($values, ['袖子线色', '袖子绣线颜色'], $translatedColor);
                 } elseif (strpos($lowerName, 'chest') !== false) {
+                    $translatedColor = $this->translateOptionColorValue(
+                        $value,
+                        $context['color_lookup'] ?? [],
+                        $context['color_translation_resolver'] ?? null
+                    );
                     $this->setFirstHeaderValueIfBlank($values, ['胸口信息颜色', '胸部信息颜色', '胸口文本颜色', '胸部文本颜色'], $translatedColor);
                 }
             }
@@ -152,7 +191,21 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             $this->setFirstHeaderValueIfBlank($values, ['左袖信息', '左袖文本'], implode("\n", $defaultLeftSleeveNameLines));
         }
 
+        if (!$hasBodyPositionOption) {
+            $this->applyFixedSkuPlacementFallback($values, $row, $context);
+        }
+
         return $values;
+    }
+
+    protected function shouldSkipCommonColorRule($lowerName)
+    {
+        return false;
+    }
+
+    protected function shouldSkipNicknameOption($lowerName, $value)
+    {
+        return false;
     }
 
     protected function attributesAfter($specs, $skipCount)
@@ -263,6 +316,81 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         }
     }
 
+    private function applySleevePositionColumnRules(array &$values)
+    {
+        if ($this->hasAnyHeaderValue($values, ['左袖信息', '左袖文本', '左袖图标', '左袖符号'])) {
+            $this->setSleevePositionAfterAnchor(
+                $values,
+                ['左袖图标', '左袖符号', '左袖信息', '左袖文本'],
+                '左袖'
+            );
+        }
+
+        if ($this->hasAnyHeaderValue($values, ['右袖信息', '右袖文本', '右袖图标', '右袖符号'])) {
+            $this->setSleevePositionAfterAnchor(
+                $values,
+                ['右袖图标', '右袖符号', '右袖信息', '右袖文本'],
+                '右袖'
+            );
+        }
+    }
+
+    private function setSleevePositionAfterAnchor(array &$values, array $anchorHeaders, $position)
+    {
+        $anchorIndex = $this->firstExistingHeaderIndex($anchorHeaders);
+
+        if ($anchorIndex === null) {
+            return;
+        }
+
+        $positionIndex = $this->firstSleevePositionHeaderIndexAfter($anchorIndex);
+
+        if ($positionIndex !== null) {
+            $values[$positionIndex] = $position;
+        }
+    }
+
+    private function hasAnyHeaderValue(array $values, array $headers)
+    {
+        foreach ($headers as $header) {
+            $index = $this->headerIndex($header);
+
+            if ($index !== null && ($values[$index] ?? '') !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function firstExistingHeaderIndex(array $headers)
+    {
+        foreach ($headers as $header) {
+            $index = $this->headerIndex($header);
+
+            if ($index !== null) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstSleevePositionHeaderIndexAfter($anchorIndex)
+    {
+        foreach ($this->headers() as $index => $header) {
+            if ($index <= $anchorIndex) {
+                continue;
+            }
+
+            if (strpos((string) $header, '袖子位置') !== false) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
     protected function headerIndex($header)
     {
         $headers = $this->headers();
@@ -276,7 +404,7 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         return null;
     }
 
-    protected function translateLookupValue($value, array $lookup)
+    protected function translateLookupValue($value, array $lookup, $fallbackTranslator = null)
     {
         $value = trim((string) $value);
 
@@ -300,6 +428,10 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             }
         }
 
+        if ($fallbackTranslator !== null && method_exists($fallbackTranslator, 'translate')) {
+            return $fallbackTranslator->translate($value);
+        }
+
         return $value;
     }
 
@@ -318,7 +450,49 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         );
     }
 
-    protected function translateOptionColorValue($value, array $lookup)
+    protected function resolveSkuPlacement(array $context, array $row)
+    {
+        $resolver = $context['sku_placement_resolver'] ?? null;
+
+        if ($resolver === null || !method_exists($resolver, 'resolve')) {
+            return '';
+        }
+
+        return (string) $resolver->resolve(
+            $row['cleaned_sku'] ?? $row['sku'] ?? '',
+            $row['website'] ?? ''
+        );
+    }
+
+    protected function hasBodyPositionAttribute(array $attributes)
+    {
+        foreach ($attributes as $attribute) {
+            if ($this->isBodyPositionOptionName(strtolower((string) ($attribute['name'] ?? '')))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function isBodyPositionOptionName($lowerName)
+    {
+        $lowerName = strtolower((string) $lowerName);
+
+        if (strpos($lowerName, 'sleeve') !== false || strpos($lowerName, 'collar') !== false || strpos($lowerName, 'neckline') !== false) {
+            return false;
+        }
+
+        return strpos($lowerName, 'position') !== false
+            || strpos($lowerName, 'placement') !== false;
+    }
+
+    protected function formatSpecAttributeLine(array $attribute)
+    {
+        return trim((string) ($attribute['name'] ?? '')) . '：' . trim((string) ($attribute['value'] ?? ''));
+    }
+
+    protected function translateOptionColorValue($value, array $lookup, $fallbackTranslator = null)
     {
         $parts = preg_split('/[,，]/', (string) $value);
         $translatedParts = [];
@@ -330,13 +504,29 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 continue;
             }
 
-            $translatedParts[] = $this->translateLookupValue($part, $lookup);
+            $translatedParts[] = $this->translateLookupValue($part, $lookup, $fallbackTranslator);
         }
 
         return implode(', ', $translatedParts);
     }
 
-    private function setGarmentColorFromFirstThreeAttributes(array &$values, array $attributes, array $colorLookup)
+    private function applyFixedSkuPlacementFallback(array &$values, array $row, array $context)
+    {
+        $position = $this->resolveSkuPlacement($context, $row);
+
+        if ($position === '') {
+            return;
+        }
+
+        $this->setFirstHeaderValueIfBlank($values, $this->positionHeaders(), $position);
+    }
+
+    private function positionHeaders()
+    {
+        return ['胸口位置', '胸部位置', '烫画位置', '刺绣位置'];
+    }
+
+    private function setGarmentColorFromFirstThreeAttributes(array &$values, array $attributes, array $colorLookup, $fallbackTranslator = null)
     {
         foreach (array_slice($attributes, 0, 3) as $attribute) {
             $name = strtolower((string) ($attribute['name'] ?? ''));
@@ -346,7 +536,7 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 continue;
             }
 
-            $this->setFirstHeaderValue($values, ['衣服颜色', '裤子颜色'], $this->translateOptionColorValue($value, $colorLookup));
+            $this->setFirstHeaderValue($values, ['衣服颜色', '裤子颜色'], $this->translateOptionColorValue($value, $colorLookup, $fallbackTranslator));
             return;
         }
     }
@@ -369,17 +559,25 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         return strpos($lowerName, 'icon') !== false || strpos($lowerName, 'pattern') !== false;
     }
 
-    private function displayValuesFromOptionValues(array $row, array $context, $optionName, $optionValue, $filterIconPlaceholders)
+    private function displayValuesFromOptionValues(array $row, array $context, $optionName, $optionValue, $filterIconPlaceholders, $filterPlaceholderValues = false)
     {
         $displayValues = [];
 
         foreach ($this->splitOptionValues($optionValue) as $part) {
-            if ($filterIconPlaceholders && $this->isIgnoredIconValue($part)) {
+            if (($filterIconPlaceholders && $this->isIgnoredIconValue($part))
+                || ($filterPlaceholderValues && $this->isIgnoredPlaceholderValue($part))) {
                 continue;
             }
 
             $image = $this->resolveOptionImage($context, $row, $optionName, $part);
-            $displayValues[] = $image !== '' ? $image : $part;
+            $displayValue = $image !== '' ? $image : $part;
+
+            if (($filterIconPlaceholders && $this->isIgnoredIconValue($displayValue))
+                || ($filterPlaceholderValues && $this->isIgnoredPlaceholderValue($displayValue))) {
+                continue;
+            }
+
+            $displayValues[] = $displayValue;
         }
 
         return $displayValues;
@@ -405,6 +603,10 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
     {
         $lowerValue = strtolower((string) $value);
 
+        if ($this->isIgnoredPlaceholderValue($value)) {
+            return true;
+        }
+
         if (strpos($lowerValue, 'upload') !== false && strpos($lowerValue, 'photo') !== false) {
             return true;
         }
@@ -418,15 +620,18 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             return true;
         }
 
-        if (preg_match('/\byes\b/i', (string) $value)) {
-            return true;
-        }
-
-        return strpos($lowerValue, 'no thank') !== false;
+        return strpos($lowerValue, 'no thank') !== false
+            || strpos($lowerValue, 'no-thank') !== false
+            || strpos($lowerValue, 'no_thank') !== false
+            || strpos($lowerValue, 'no. thank') !== false;
     }
 
     private function appendGiftDisplayValues(array &$values, array $row, array $context, $optionName, $optionValue, $lowerName)
     {
+        if ($this->isIgnoredGiftValue($optionValue)) {
+            return;
+        }
+
         $headers = ['贺卡/礼品', '贺卡/包装'];
 
         if (strpos($lowerName, 'greeting card') !== false) {
@@ -437,9 +642,32 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             $headers[] = '礼品袋';
         }
 
-        foreach ($this->displayValuesFromOptionValues($row, $context, $optionName, $optionValue, false) as $displayValue) {
+        foreach ($this->displayValuesFromOptionValues($row, $context, $optionName, $optionValue, false, true) as $displayValue) {
+            if ($this->isIgnoredGiftValue($displayValue)) {
+                continue;
+            }
+
             $this->appendFirstHeaderValue($values, $headers, $displayValue);
         }
+    }
+
+    private function isIgnoredGiftValue($value)
+    {
+        return $this->isIgnoredPlaceholderValue($value);
+    }
+
+    private function isIgnoredPlaceholderValue($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $value = preg_replace('/\s*[\(\x{FF08}]\s*\+\s*(?:\$|usd)?\s*[\d.,]+.*?[\)\x{FF09}]\s*/iu', ' ', $value);
+        $value = preg_replace('/[^a-z0-9]+/', ' ', $value);
+        $value = trim($value);
+
+        return $value === 'yes'
+            || $value === 'no'
+            || $value === 'no thank'
+            || $value === 'no thanks'
+            || $value === 'no thank you';
     }
 
     private function sleeveTargetFromOptionName($lowerName)
@@ -475,7 +703,7 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
 
     private function formatNameLineValue($optionName, $value, $lineNumber)
     {
-        return $this->lineLabel($lineNumber) . '：' . $optionName . '：' . $value;
+        return $optionName . '：' . $value;
     }
 
     private function lineLabel($lineNumber)
@@ -513,6 +741,10 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
 
         if (strpos($lowerValue, 'right') !== false) {
             return '右胸口';
+        }
+
+        if (strpos($lowerValue, 'back') !== false || strpos($lowerValue, 'rear') !== false) {
+            return '背部中央';
         }
 
         return $value;
