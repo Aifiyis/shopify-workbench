@@ -41,13 +41,14 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         $this->setHeaderValue($values, 'sku', $row['sku'] ?? '');
         $this->setHeaderValue($values, 'cleaned_sku', $row['cleaned_sku'] ?? '');
         $this->setHeaderValue($values, '产品规格', $row['product_specs'] ?? '');
+        $this->setHeaderValue($values, '产品链接', $row['sales_link'] ?? '');
 
         return $values;
     }
 
     protected function withProductSpecsHeader(array $headers)
     {
-        foreach (['产品规格', 'sku', 'cleaned_sku'] as $header) {
+        foreach (['产品规格', 'sku', 'cleaned_sku', '产品链接'] as $header) {
             if (!in_array($header, $headers, true)) {
                 $headers[] = $header;
             }
@@ -422,12 +423,6 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             }
         }
 
-        foreach ($lookup as $key => $translated) {
-            if ($key !== '' && stripos($value, (string) $key) !== false) {
-                return $translated;
-            }
-        }
-
         if ($fallbackTranslator !== null && method_exists($fallbackTranslator, 'translate')) {
             return $fallbackTranslator->translate($value);
         }
@@ -611,6 +606,10 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
             return true;
         }
 
+        if (strpos($lowerValue, 'upload') !== false && strpos($lowerValue, 'icon') !== false) {
+            return true;
+        }
+
         if (strpos($lowerValue, 'add') !== false
             && (strpos($lowerValue, 'name') !== false || strpos($lowerValue, 'text') !== false)) {
             return true;
@@ -681,6 +680,135 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         }
 
         return '';
+    }
+
+    protected function applyNameLinesToSleeveInfo(array &$values, array $attributes, $target = 'left', $countOptionName = 'add names on the sleeve')
+    {
+        $count = $this->positiveIntegerAttributeValue($attributes, $countOptionName);
+
+        if ($count <= 0) {
+            return false;
+        }
+
+        $names = $this->collectNameLineValues($attributes);
+        $selectedNames = [];
+
+        foreach ($names as $lineNumber => $value) {
+            if ($lineNumber <= $count) {
+                $selectedNames[] = $value;
+            }
+        }
+
+        if (empty($selectedNames)) {
+            return false;
+        }
+
+        if ($target === 'right') {
+            $this->setFirstHeaderValue($values, ['右袖信息', '右袖文本'], implode("\n", $selectedNames));
+        } else {
+            $this->setFirstHeaderValue($values, ['左袖信息', '左袖文本'], implode("\n", $selectedNames));
+        }
+
+        return true;
+    }
+
+    protected function appendNameLinesToChestInfo(array &$values, array $attributes, $clearMatchingLeftSleeve = true)
+    {
+        $nameLines = array_values($this->collectNameLineValues($attributes, true, true));
+
+        if (empty($nameLines)) {
+            return false;
+        }
+
+        $nameBlock = implode("\n", $nameLines);
+        $this->appendFirstHeaderValue($values, ['胸口信息文本', '胸口信息', '胸部信息'], $nameBlock);
+
+        if ($clearMatchingLeftSleeve) {
+            $leftSleeveIndex = $this->headerIndex('左袖信息');
+
+            if ($leftSleeveIndex !== null && ($values[$leftSleeveIndex] ?? '') === $nameBlock) {
+                $values[$leftSleeveIndex] = '';
+            }
+        }
+
+        return true;
+    }
+
+    protected function setNicknameNameLinesToChestInfo(array &$values, array $attributes, $label)
+    {
+        $lines = [];
+        $nickname = $this->firstAttributeValue($attributes, ['nickname']);
+
+        if ($nickname !== '') {
+            $lines[] = $nickname;
+        }
+
+        $nameValues = array_values($this->collectNameLineValues($attributes, false, true));
+
+        if (!empty($nameValues)) {
+            $lines[] = $label;
+            $lines = array_merge($lines, $nameValues);
+        }
+
+        if (empty($lines)) {
+            return false;
+        }
+
+        $this->setFirstHeaderValue($values, ['胸口信息文本', '胸口信息', '胸部信息'], implode("\n", $lines));
+
+        return true;
+    }
+
+    protected function collectNameLineValues(array $attributes, $includeOptionName = false, $excludeIconPatternSleeve = false)
+    {
+        $values = [];
+
+        foreach ($attributes as $attribute) {
+            $name = trim((string) ($attribute['name'] ?? ''));
+            $value = trim((string) ($attribute['value'] ?? ''));
+            $lowerName = strtolower($name);
+            $lineNumber = $this->extractNameLineNumber($name);
+
+            if ($lineNumber === null || $value === '') {
+                continue;
+            }
+
+            if ($excludeIconPatternSleeve
+                && (strpos($lowerName, 'icon') !== false
+                    || strpos($lowerName, 'pattern') !== false
+                    || strpos($lowerName, 'sleeve') !== false)) {
+                continue;
+            }
+
+            $values[$lineNumber] = $includeOptionName ? $this->formatNameLineValue($name, $value, $lineNumber) : $value;
+        }
+
+        ksort($values);
+
+        return $values;
+    }
+
+    private function positiveIntegerAttributeValue(array $attributes, $optionNameNeedle)
+    {
+        $optionNameNeedle = strtolower((string) $optionNameNeedle);
+
+        foreach ($attributes as $attribute) {
+            $name = strtolower(trim((string) ($attribute['name'] ?? '')));
+
+            if (strpos($name, $optionNameNeedle) === false) {
+                continue;
+            }
+
+            $value = trim((string) ($attribute['value'] ?? ''));
+
+            if (preg_match('/\d+/', $value, $matches)) {
+                return (int) $matches[0];
+            }
+
+            return 0;
+        }
+
+        return 0;
     }
 
     private function extractNameLineNumber($optionName)

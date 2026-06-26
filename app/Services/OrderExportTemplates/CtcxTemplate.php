@@ -71,6 +71,10 @@ class CtcxTemplate extends AbstractOrderExportTemplate
             return $this->applyDefaultChestPosition($this->applyQk2571Rules($values, $attributes));
         }
 
+        if (strpos($sku, 'CS-QK2433-CX') !== false) {
+            $values = $this->applyQk2433Rules($values);
+        }
+
         return $this->applyDefaultChestPosition($values);
     }
 
@@ -228,7 +232,117 @@ class CtcxTemplate extends AbstractOrderExportTemplate
             }
         }
 
+        $this->applyNameLinesToSleeveInfo($values, $attributes, 'left', 'add names on the sleeve');
+
         return $values;
+    }
+
+    private function applyQk2433Rules(array $values)
+    {
+        if (!$this->hasSleeveContent($values)) {
+            return $values;
+        }
+
+        $chestColorIndex = $this->headerIndexOrFallback('鑳搁儴淇℃伅棰滆壊', 20);
+        $sleeveColor = $this->sleeveColorFromChestInfoColors((string) ($values[$chestColorIndex] ?? ''));
+
+        if ($sleeveColor !== '') {
+            $this->setHeaderOrFallbackValue($values, '琚栧瓙缁ｇ嚎棰滆壊', 18, $sleeveColor);
+        }
+
+        return $values;
+    }
+
+    private function hasSleeveContent(array $values)
+    {
+        foreach ([
+            ['宸﹁淇℃伅', 9],
+            ['宸﹁鍥炬爣', 10],
+            ['鍙宠淇℃伅', 14],
+            ['鍙宠鍥炬爣', 15],
+        ] as $candidate) {
+            $index = $this->headerIndexOrFallback($candidate[0], $candidate[1]);
+
+            if ($index !== null && trim((string) ($values[$index] ?? '')) !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function headerIndexOrFallback($header, $fallbackIndex)
+    {
+        $index = $this->headerIndex($header);
+
+        return $index !== null ? $index : $fallbackIndex;
+    }
+
+    private function setHeaderOrFallbackValue(array &$values, $header, $fallbackIndex, $value)
+    {
+        $index = $this->headerIndexOrFallback($header, $fallbackIndex);
+
+        if ($index !== null) {
+            $values[$index] = $value;
+        }
+    }
+
+    private function sleeveColorFromChestInfoColors($chestInfoColors)
+    {
+        $colors = $this->extractChestInfoColors($chestInfoColors);
+
+        if (empty($colors)) {
+            return '';
+        }
+
+        $counts = [];
+
+        foreach ($colors as $color) {
+            $key = mb_strtolower($color, 'UTF-8');
+            $counts[$key] = ($counts[$key] ?? 0) + 1;
+        }
+
+        foreach ($colors as $color) {
+            if (($counts[mb_strtolower($color, 'UTF-8')] ?? 0) > 1) {
+                return $color;
+            }
+        }
+
+        foreach ($colors as $color) {
+            $lowerColor = mb_strtolower($color, 'UTF-8');
+
+            if (strpos($lowerColor, 'navy') !== false || strpos($color, '海军蓝') !== false) {
+                return $color;
+            }
+        }
+
+        return $colors[count($colors) - 1];
+    }
+
+    private function extractChestInfoColors($chestInfoColors)
+    {
+        $colors = [];
+        $lines = preg_split('/\r\n|\n|\r/', (string) $chestInfoColors);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            $line = preg_replace('/^.*?(?:[:：]|細)/u', '', $line, 1);
+
+            foreach (preg_split('/[,，]/u', $line) as $color) {
+                $color = trim($color);
+
+                if ($color !== '') {
+                    $colors[] = $color;
+                }
+            }
+        }
+
+        return $colors;
     }
 
     private function translateColorList($value, array $colorLookup, $colorTranslator)

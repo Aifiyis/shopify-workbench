@@ -126,6 +126,7 @@ class CommonOptionRulesTest extends TestCase
             {
                 $images = [
                     'Left Sleeve Pattern|Heart' => 'https://example.test/heart.png',
+                    'Left Sleeve Pattern|Upload Your Icon' => 'https://example.test/upload-icon.png',
                     'Left Sleeve Pattern|Star' => 'https://example.test/star.png',
                     'Right Sleeve Icon|Crown' => 'https://example.test/crown.png',
                 ];
@@ -143,7 +144,7 @@ class CommonOptionRulesTest extends TestCase
                 'Color: Black',
                 'Size: M',
                 'Material: Cotton',
-                'Left Sleeve Pattern: Heart, Upload Photo, Add Name, Choose Logo, Yes, No Thank You, Star',
+                'Left Sleeve Pattern: Heart, Upload Photo, Upload Your Icon, Add Name, Choose Logo, Yes, No Thank You, Star',
                 'Right Sleeve Icon: Crown',
             ]),
         ], [

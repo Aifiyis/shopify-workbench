@@ -327,6 +327,46 @@ class StyleImageHeatTransferTemplateTest extends TestCase
         $this->assertSame('红色, 酒红色（翻译原值：Burgundy）', $this->valueForHeader($template, $row, '后背信息'));
     }
 
+    public function test_mirror_year_color_routes_to_chest_and_back_text_colors_not_back_info()
+    {
+        $template = new StyleImageHeatTransferTemplate();
+        $placementResolver = new class {
+            public function resolveRule($cleanedSku, $website = '')
+            {
+                return [
+                    'placement_behavior' => $cleanedSku === 'CS-QK0138-TH' ? 'mirror_chest_to_back' : '',
+                ];
+            }
+
+            public function resolve($cleanedSku, $website = '')
+            {
+                return $cleanedSku === 'CS-QK0138-TH' ? 'left chest and back' : '';
+            }
+        };
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-STYLE-QK0138',
+            'sku' => 'CS-QK0138-TH-T-Shirt',
+            'cleaned_sku' => 'CS-QK0138-TH',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'EST Year Color: Red',
+            ]),
+        ], [
+            'color_lookup' => [
+                'Red' => "\u{7EA2}\u{8272}",
+            ],
+            'sku_placement_resolver' => $placementResolver,
+        ]);
+
+        $this->assertSame('', $row[11]);
+        $this->assertSame("\u{7EA2}\u{8272}", $row[12]);
+        $this->assertSame("\u{7EA2}\u{8272}", $row[13]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

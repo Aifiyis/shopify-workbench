@@ -97,6 +97,7 @@ class PersonOutlineColorTemplate extends AbstractOrderExportTemplate
         $this->applySleeveNameRules($values, $allAttributes);
         $this->applyHr2938Rules($values, $allAttributes, $row, $context);
         $this->applyHr2572Rules($values, $allAttributes, $row, $context);
+        $this->applyQk0976Rules($values, $allAttributes, $row);
         $this->applyOutlineThreadColorRules($values, $allAttributes, $context);
         $this->applyFullColorCenterThreadColorRules($values, $allAttributes, $context);
 
@@ -148,7 +149,7 @@ class PersonOutlineColorTemplate extends AbstractOrderExportTemplate
             $this->setHeaderValue($values, '左袖图标', $image !== '' ? $image : $pattern);
         }
 
-        $names = $this->nameValuesByLineNumber($attributes);
+        $names = $this->collectNameLineValues($attributes);
 
         if (!empty($names)) {
             ksort($names);
@@ -180,17 +181,22 @@ class PersonOutlineColorTemplate extends AbstractOrderExportTemplate
         }
 
         $threadColor = $this->firstExactAttributeValue($attributes, 'Thread Color');
+        $outlineColor = $threadColor !== '' ? $threadColor : $this->firstExactAttributeValue($attributes, 'Choose Thread Color');
 
-        if ($threadColor === '') {
+        if ($outlineColor === '') {
             return;
         }
 
         $translatedColor = $this->translateLookupValue(
-            $threadColor,
+            $outlineColor,
             $context['color_lookup'] ?? [],
             $context['color_translation_resolver'] ?? null
         );
         $this->setFirstHeaderValue($values, ['图片轮廓线色', '图片轮廓颜色'], $translatedColor);
+
+        if ($threadColor === '') {
+            return;
+        }
 
         if ($this->hasAnyHeaderValue($values, ['左袖信息', '左袖图标', '右袖信息', '右袖图标'])) {
             $this->setHeaderValue($values, '袖子绣线颜色', $translatedColor);
@@ -294,6 +300,25 @@ class PersonOutlineColorTemplate extends AbstractOrderExportTemplate
         }
     }
 
+    private function applyQk0976Rules(array &$values, array $attributes, array $row)
+    {
+        if (!$this->isSku($row, 'CS-QK0976-CX')) {
+            return;
+        }
+
+        $customText = $this->firstExactAttributeValue($attributes, 'Custom text or roman numerals');
+
+        if ($customText !== '') {
+            $this->setHeaderValue($values, '图片1下方文字', $customText);
+        }
+
+        $border = strtolower($this->firstExactAttributeValue($attributes, 'Add A Border To The Image'));
+
+        if ($border === 'yes') {
+            $this->setHeaderValue($values, '是否给图片添加边框', '是');
+        }
+    }
+
     private function firstExactAttributeValue(array $attributes, $targetName)
     {
         foreach ($attributes as $attribute) {
@@ -360,68 +385,7 @@ class PersonOutlineColorTemplate extends AbstractOrderExportTemplate
 
     private function applySleeveNameRules(array &$values, array $attributes)
     {
-        $count = $this->addNamesOnSleeveCount($attributes);
-
-        if ($count <= 0) {
-            return;
-        }
-
-        $names = $this->nameValuesByLineNumber($attributes);
-
-        if (empty($names)) {
-            return;
-        }
-
-        ksort($names);
-        $selectedNames = [];
-
-        foreach ($names as $lineNumber => $value) {
-            if ($lineNumber > $count) {
-                continue;
-            }
-
-            $selectedNames[] = $value;
-        }
-
-        if (!empty($selectedNames)) {
-            $this->setHeaderValue($values, '左袖信息', implode("\n", $selectedNames));
-        }
-    }
-
-    private function addNamesOnSleeveCount(array $attributes)
-    {
-        foreach ($attributes as $attribute) {
-            $name = strtolower(trim((string) ($attribute['name'] ?? '')));
-
-            if (strpos($name, 'add names on sleeve') === false) {
-                continue;
-            }
-
-            $digits = preg_replace('/\D+/', '', (string) ($attribute['value'] ?? ''));
-            return (int) $digits;
-        }
-
-        return 0;
-    }
-
-    private function nameValuesByLineNumber(array $attributes)
-    {
-        $values = [];
-
-        foreach ($attributes as $attribute) {
-            $name = trim((string) ($attribute['name'] ?? ''));
-            $value = trim((string) ($attribute['value'] ?? ''));
-
-            if ($value === '') {
-                continue;
-            }
-
-            if (preg_match('/\bname\s*#?\s*(\d+)\b/i', $name, $matches)) {
-                $values[(int) $matches[1]] = $value;
-            }
-        }
-
-        return $values;
+        $this->applyNameLinesToSleeveInfo($values, $attributes, 'left', 'add names on sleeve');
     }
 
     private function isSku(array $row, $targetSku)

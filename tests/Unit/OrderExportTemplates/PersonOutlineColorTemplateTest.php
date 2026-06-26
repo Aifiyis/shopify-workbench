@@ -250,6 +250,32 @@ class PersonOutlineColorTemplateTest extends TestCase
         $this->assertSame('', $this->valueForHeader($template, $row, '袖子绣线颜色'));
     }
 
+    public function test_outline_choose_thread_color_maps_to_outline_color()
+    {
+        $template = new PersonOutlineColorTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-PERSON-CHOOSE-THREAD',
+            'sku' => 'PERSON-OUTLINE-CHOOSE-SKU',
+            'cleaned_sku' => 'PERSON-OUTLINE-CHOOSE-SKU',
+            'chinese_name' => '人物轮廓',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'Choose Thread Color: Blue',
+            ]),
+        ], [
+            'color_lookup' => [
+                'Blue' => '蓝色',
+            ],
+        ]);
+
+        $this->assertSame('轮廓', $this->valueForHeader($template, $row, '全彩/轮廓'));
+        $this->assertSame('蓝色', $this->valueForHeader($template, $row, '图片轮廓线色'));
+    }
+
     public function test_full_color_center_chest_maps_non_sleeve_thread_color_to_outline_color()
     {
         $template = new PersonOutlineColorTemplate();
@@ -351,6 +377,29 @@ class PersonOutlineColorTemplateTest extends TestCase
         $this->assertSame("Nana\nLove you", $this->valueForHeader($template, $row, '胸口信息'));
         $this->assertSame('Lily', $this->valueForHeader($template, $row, '左袖信息'));
         $this->assertSame('D:\\workspace\\shopify-workbench\\storage\\app\\private\\sku-options-image\\font-a.png', $this->valueForHeader($template, $row, '胸口样式'));
+    }
+
+    public function test_qk0976_maps_custom_text_and_border_flag()
+    {
+        $template = new PersonOutlineColorTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-PERSON-QK0976',
+            'sku' => 'RAW-CS-QK0976-CX',
+            'cleaned_sku' => 'CS-QK0976-CX',
+            'chinese_name' => '人物轮廓',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'Custom text or roman numerals: XII',
+                'Add A Border To The Image: Yes',
+            ]),
+        ], []);
+
+        $this->assertSame('XII', $this->valueForHeader($template, $row, '图片1下方文字'));
+        $this->assertSame('是', $this->valueForHeader($template, $row, '是否给图片添加边框'));
     }
 
     private function valueForHeader($template, array $row, $header)

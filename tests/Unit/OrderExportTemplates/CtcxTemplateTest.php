@@ -295,6 +295,170 @@ class CtcxTemplateTest extends TestCase
         $this->assertSame('胸部中央', $this->valueForHeader($template, $row, '胸部位置'));
     }
 
+    public function test_qk2433_uses_repeated_chest_color_for_sleeve_thread_color_when_sleeve_has_content()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-8',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK2433-CX-001',
+            'cleaned_sku' => 'CS-QK2433-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'School Initials: ABC',
+                'Thread Color for Initials: White',
+                'Add 2nd Line Text: DEF',
+                'Thread Color for 2nd Line: Red',
+                'Add 3rd Line Text: GHI',
+                'Thread Color for 3rd Line: Red',
+                'Enter Name on Left Sleeve: Lily',
+            ]),
+        ], [
+            'color_lookup' => [
+                'White' => "\u{767D}\u{8272}",
+                'Red' => "\u{7EA2}\u{8272}",
+            ],
+        ]);
+
+        $this->assertSame("\u{7EA2}\u{8272}", $row[18]);
+    }
+
+    public function test_qk2433_uses_navy_for_sleeve_thread_color_when_no_color_repeats()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-9',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK2433-CX-002',
+            'cleaned_sku' => 'CS-QK2433-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'School Initials: ABC',
+                'Thread Color for Initials: White',
+                'Add 2nd Line Text: DEF',
+                'Thread Color for 2nd Line: Navy',
+                'Add 3rd Line Text: GHI',
+                'Thread Color for 3rd Line: Red',
+                'Enter Name on Left Sleeve: Lily',
+            ]),
+        ], [
+            'color_lookup' => [
+                'White' => "\u{767D}\u{8272}",
+                'Navy' => "\u{6D77}\u{519B}\u{84DD}",
+                'Red' => "\u{7EA2}\u{8272}",
+            ],
+        ]);
+
+        $this->assertSame("\u{6D77}\u{519B}\u{84DD}", $row[18]);
+    }
+
+    public function test_qk2433_uses_last_chest_color_for_sleeve_thread_color_as_fallback()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-10',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK2433-CX-003',
+            'cleaned_sku' => 'CS-QK2433-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'School Initials: ABC',
+                'Thread Color for Initials: White',
+                'Add 2nd Line Text: DEF',
+                'Thread Color for 2nd Line: Gold',
+                'Add 3rd Line Text: GHI',
+                'Thread Color for 3rd Line: Red',
+                'Enter Name on Left Sleeve: Lily',
+            ]),
+        ], [
+            'color_lookup' => [
+                'White' => "\u{767D}\u{8272}",
+                'Gold' => "\u{91D1}\u{8272}",
+                'Red' => "\u{7EA2}\u{8272}",
+            ],
+        ]);
+
+        $this->assertSame("\u{7EA2}\u{8272}", $row[18]);
+    }
+
+    public function test_ctcx_ignores_upload_your_icon_left_sleeve_placeholder()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-11',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK2433-CX-004',
+            'cleaned_sku' => 'CS-QK2433-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'Choose Icon on Left Sleeve: Upload Your Icon',
+            ]),
+        ], []);
+
+        $this->assertSame('', $row[10]);
+        $this->assertSame('', $row[13]);
+    }
+
+    public function test_qk2571_add_names_on_sleeve_moves_limited_names_to_left_sleeve_info()
+    {
+        $template = new CtcxTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-12',
+            'product_image' => '',
+            'style' => '',
+            'color' => '',
+            'size' => 'M',
+            'quantity' => 1,
+            'sku' => 'ABC-CS-QK2571-CX-001',
+            'cleaned_sku' => 'CS-QK2571-CX',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'Add names on the sleeve: 2',
+                'Name #1: Lily',
+                'Name #2: Max',
+                'Name #3: Ava',
+            ]),
+        ], []);
+
+        $this->assertSame("Lily\nMax", $row[9]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

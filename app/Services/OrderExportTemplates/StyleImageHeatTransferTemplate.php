@@ -65,6 +65,12 @@ class StyleImageHeatTransferTemplate extends AbstractOrderExportTemplate
             }
 
             if (strpos($lowerName, 'color') !== false
+                && (strpos($lowerName, 'year') !== false || strpos($lowerName, 'est') !== false)
+                && $this->routeYearColorByPlacementBehavior($values, $row, $context, $value)) {
+                continue;
+            }
+
+            if (strpos($lowerName, 'color') !== false
                 && (strpos($lowerName, 'back') !== false || strpos($lowerName, 'year') !== false)) {
                 $this->appendFirstHeaderValue(
                     $values,
@@ -87,6 +93,42 @@ class StyleImageHeatTransferTemplate extends AbstractOrderExportTemplate
         $this->applyFixedTextColorRules($values, $row);
 
         return $values;
+    }
+
+    private function routeYearColorByPlacementBehavior(array &$values, array $row, array $context, $value)
+    {
+        $cleanedSku = strtoupper(trim((string) ($row['cleaned_sku'] ?? $row['sku'] ?? '')));
+        $sku = strtoupper(trim((string) ($row['sku'] ?? '')));
+
+        if ($cleanedSku !== 'CS-QK0138-TH' && strpos($sku, 'CS-QK0138-TH') === false) {
+            return false;
+        }
+
+        $rule = $this->resolveSkuPlacementRule($context, $row);
+
+        if (($rule['placement_behavior'] ?? '') !== 'mirror_chest_to_back') {
+            return false;
+        }
+
+        $translatedColor = $this->translateOptionColorValue(
+            $value,
+            $context['color_lookup'] ?? [],
+            $context['color_translation_resolver'] ?? null
+        );
+
+        $this->appendIndexedValue($values, 12, $translatedColor);
+        $this->appendIndexedValue($values, 13, $translatedColor);
+
+        return true;
+    }
+
+    private function appendIndexedValue(array &$values, $index, $value)
+    {
+        if (($values[$index] ?? '') === '') {
+            $values[$index] = $value;
+        } else {
+            $values[$index] .= "\n" . $value;
+        }
     }
 
     private function routeRecipientByPlacementBehavior(array &$values, array $row, array $context, $value)

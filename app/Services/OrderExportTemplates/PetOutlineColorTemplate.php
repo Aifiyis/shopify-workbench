@@ -71,6 +71,10 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
             $this->setHeaderValue($values, '图片1', $photo);
         }
 
+        if ($this->hasAttributeNameContaining($allAttributes, 'number of pet')) {
+            $this->applyNumberedPetPhotoRules($values, $allAttributes);
+        }
+
         if (($row['chinese_name'] ?? '') === '宠物轮廓') {
             $this->setHeaderValue($values, '全彩/轮廓', '轮廓');
         }
@@ -83,9 +87,19 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
             $this->applyQk0833Rules(
                 $values,
                 $allAttributes,
+                $row,
+                $context,
                 $context['color_lookup'] ?? [],
                 $context['color_translation_resolver'] ?? null
             );
+        }
+
+        if ($this->isQk3961($row)) {
+            $this->applyQk3961Rules($values, $allAttributes, $row, $context);
+        }
+
+        if ($this->isMyx6625($row)) {
+            $this->applyMyx6625Rules($values, $allAttributes, $row, $context);
         }
 
         $this->applyOutlineThreadColorRules(
@@ -95,16 +109,38 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
             $context['color_translation_resolver'] ?? null
         );
 
+        $this->setHeaderValueIfBlank($values, '胸口位置', '胸部中央');
+
         return $values;
     }
 
-    private function applyQk0833Rules(array &$values, array $attributes, array $colorLookup, $colorTranslator)
+    private function applyNumberedPetPhotoRules(array &$values, array $attributes)
+    {
+        foreach ($attributes as $attribute) {
+            $name = trim((string) ($attribute['name'] ?? ''));
+            $value = trim((string) ($attribute['value'] ?? ''));
+            $lowerName = strtolower($name);
+
+            if ($value === ''
+                || strpos($lowerName, 'text below') !== false
+                || strpos($lowerName, 'text under') !== false) {
+                continue;
+            }
+
+            if (preg_match('/photo\s*#?\s*(\d+)/i', $name, $matches)) {
+                $this->setHeaderValue($values, '图片' . (int) $matches[1], $value);
+            }
+        }
+    }
+
+    private function applyQk0833Rules(array &$values, array $attributes, array $row, array $context, array $colorLookup, $colorTranslator)
     {
         $petName = $this->firstExactAttributeValue($attributes, 'Pet Name');
         $est = $this->firstExactAttributeValue($attributes, 'EST');
         $outlineColor = $this->firstExactAttributeValue($attributes, 'Thread Color For Pet Name Outline');
         $nameColor = $this->firstExactAttributeValue($attributes, 'Thread Color For Pet Name');
         $estColor = $this->firstExactAttributeValue($attributes, 'Thread Color For EST and Other Text');
+        $sleeveIcon = $this->firstExactAttributeValue($attributes, 'Choose Icon On Sleeve');
 
         if ($petName !== '') {
             $this->setHeaderValue($values, '宠物名字胸部信息', $petName);
@@ -144,11 +180,175 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
             $this->setHeaderValue($values, '胸口样式', implode("\n", $styleLines));
         }
 
+        if ($sleeveIcon !== '') {
+            $iconImage = $this->resolveOptionImage($context, $row, 'Choose Icon On Sleeve', $sleeveIcon);
+            $this->setHeaderValue($values, '左袖图标', $iconImage !== '' ? $iconImage : $sleeveIcon);
+        }
+
         if ($this->hasAnySleeveContent($values) && $estColor !== '') {
             $this->setHeaderValue($values, '袖子绣线颜色', $this->translateLookupValue($estColor, $colorLookup, $colorTranslator));
         } else {
             $this->setHeaderValue($values, '袖子绣线颜色', '');
         }
+    }
+
+    private function applyQk3961Rules(array &$values, array $attributes, array $row, array $context)
+    {
+        $photoTextLines = [];
+        $topDesignLines = [];
+
+        foreach ($attributes as $attribute) {
+            $name = trim((string) ($attribute['name'] ?? ''));
+            $value = trim((string) ($attribute['value'] ?? ''));
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (preg_match('/text below the photo\s*#?\s*(\d+)/i', $name, $matches)) {
+                $photoTextLines[(int) $matches[1]] = $matches[1] . ': ' . $value;
+                continue;
+            }
+
+            if (preg_match('/design on top of the pet\'?s head\s*#?\s*(\d+)/i', $name, $matches)) {
+                $lowerValue = strtolower($value);
+                $lineNumber = (int) $matches[1];
+
+                if (strpos($lowerValue, 'golden angel halo') !== false) {
+                    $topDesignLines[$lineNumber] = $lineNumber . ': 添加天使光环';
+                } elseif (strpos($lowerValue, 'halo with gold wings') !== false) {
+                    $topDesignLines[$lineNumber] = $lineNumber . ': 添加天使翅膀';
+                }
+            }
+        }
+
+        if (!empty($photoTextLines)) {
+            ksort($photoTextLines);
+            $this->setHeaderValue($values, '宠物名字胸部信息', implode("\n", array_values($photoTextLines)));
+        }
+
+        if (!empty($topDesignLines)) {
+            ksort($topDesignLines);
+            $this->setHeaderValue($values, '是否添加天使光环或翅膀', implode("\n", array_values($topDesignLines)));
+        }
+
+        $sleeveTargets = $this->qk3961SleeveTargets($this->firstExactAttributeValue($attributes, 'Add text somewhere else'));
+
+        if (empty($sleeveTargets)) {
+            return;
+        }
+
+        $fontStyle = $this->firstExactAttributeValue($attributes, 'Choose text font style');
+        $sleevePattern = $this->firstExactAttributeValue($attributes, 'Choose Pattern on Sleeve');
+
+        if ($fontStyle !== '') {
+            $fontImage = $this->resolveOptionImage($context, $row, 'Choose text font style', $fontStyle);
+            $fontValue = $fontImage !== '' ? $fontImage : $fontStyle;
+
+            if (in_array('left', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '左袖字体', $fontValue);
+            }
+
+            if (in_array('right', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '右袖字体', $fontValue);
+            }
+        }
+
+        if ($sleevePattern !== '') {
+            $patternImage = $this->resolveOptionImage($context, $row, 'Choose Pattern on Sleeve', $sleevePattern);
+            $patternValue = $patternImage !== '' ? $patternImage : $sleevePattern;
+
+            if (in_array('left', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '左袖图标', $patternValue);
+            }
+
+            if (in_array('right', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '右袖图标', $patternValue);
+            }
+        }
+    }
+
+    private function qk3961SleeveTargets($value)
+    {
+        $value = strtolower(trim((string) $value));
+
+        if ($value === '') {
+            return [];
+        }
+
+        if (strpos($value, 'both sleeves') !== false) {
+            return ['left', 'right'];
+        }
+
+        if (strpos($value, 'left sleeve') !== false) {
+            return ['left'];
+        }
+
+        if (strpos($value, 'right sleeve') !== false) {
+            return ['right'];
+        }
+
+        return [];
+    }
+
+    private function applyMyx6625Rules(array &$values, array $attributes, array $row, array $context)
+    {
+        $textUnderPhoto = $this->firstExactAttributeValue($attributes, 'Text Under the Photo');
+
+        if ($textUnderPhoto !== '') {
+            $this->setHeaderValue($values, '宠物名字胸部信息', $textUnderPhoto);
+        }
+
+        $sleeveTargets = $this->myx6625SleeveTargets($this->firstExactAttributeValue($attributes, 'Add Text on Sleeve'));
+
+        if (empty($sleeveTargets)) {
+            return;
+        }
+
+        $fontStyle = $this->firstExactAttributeValue($attributes, 'Choose text font style');
+        $sleeveIcon = $this->firstExactAttributeValue($attributes, 'Choose Icon on Sleeve');
+
+        if ($fontStyle !== '') {
+            $fontImage = $this->resolveOptionImage($context, $row, 'Choose text font style', $fontStyle);
+            $fontValue = $fontImage !== '' ? $fontImage : $fontStyle;
+
+            if (in_array('left', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '左袖字体', $fontValue);
+            }
+
+            if (in_array('right', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '右袖字体', $fontValue);
+            }
+        }
+
+        if ($sleeveIcon !== '') {
+            $iconImage = $this->resolveOptionImage($context, $row, 'Choose Icon on Sleeve', $sleeveIcon);
+            $iconValue = $iconImage !== '' ? $iconImage : $sleeveIcon;
+
+            if (in_array('left', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '左袖图标', $iconValue);
+            }
+
+            if (in_array('right', $sleeveTargets, true)) {
+                $this->setHeaderValue($values, '右袖图标', $iconValue);
+            }
+        }
+    }
+
+    private function myx6625SleeveTargets($value)
+    {
+        $value = strtolower(trim((string) $value));
+        $targets = [];
+
+        if (strpos($value, 'left sleeve') !== false) {
+            $targets[] = 'left';
+        }
+
+        if (strpos($value, 'right sleeve') !== false) {
+            $targets[] = 'right';
+        }
+
+        return $targets;
     }
 
     private function applyOutlineThreadColorRules(array &$values, array $attributes, array $colorLookup, $colorTranslator)
@@ -186,6 +386,22 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
         return $cleanedSku === 'CS-QK0833-CX' || strpos($sku, 'CS-QK0833-CX') !== false;
     }
 
+    private function isQk3961(array $row)
+    {
+        $cleanedSku = strtoupper(trim((string) ($row['cleaned_sku'] ?? '')));
+        $sku = strtoupper(trim((string) ($row['sku'] ?? '')));
+
+        return $cleanedSku === 'CS-QK3961-CX' || strpos($sku, 'CS-QK3961-CX') !== false;
+    }
+
+    private function isMyx6625(array $row)
+    {
+        $cleanedSku = strtoupper(trim((string) ($row['cleaned_sku'] ?? '')));
+        $sku = strtoupper(trim((string) ($row['sku'] ?? '')));
+
+        return $cleanedSku === 'CS-MYX6625-CX' || strpos($sku, 'CS-MYX6625-CX') !== false;
+    }
+
     private function firstExactAttributeValue(array $attributes, $targetName)
     {
         foreach ($attributes as $attribute) {
@@ -195,6 +411,17 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
         }
 
         return '';
+    }
+
+    private function hasAttributeNameContaining(array $attributes, $needle)
+    {
+        foreach ($attributes as $attribute) {
+            if (strpos(strtolower((string) ($attribute['name'] ?? '')), strtolower($needle)) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function hasAnySleeveContent(array $values)

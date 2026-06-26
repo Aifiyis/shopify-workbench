@@ -115,6 +115,31 @@ class ColorTranslationResolverTest extends TestCase
         $this->assertSame(0, $translator->calls);
     }
 
+    public function test_color_lookup_does_not_use_partial_matching()
+    {
+        $template = new StyleImageHeatTransferTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-STYLE-PARTIAL-LOOKUP',
+            'sku' => 'CS-STYLE-PARTIAL',
+            'cleaned_sku' => 'CS-STYLE-PARTIAL',
+            'product_specs' => implode("\n", [
+                'Color: Powder Blue',
+                'Size: M',
+                'Material: Cotton',
+                'Back Color: Powder Blue',
+            ]),
+        ], [
+            'color_lookup' => [
+                'Blue' => "\u{84DD}\u{8272}",
+            ],
+        ]);
+
+        $this->assertSame('Powder Blue', $row[6]);
+        $this->assertSame('Powder Blue', $row[11]);
+    }
+
     private function cachePath()
     {
         if (!is_string($this->tempDirectory)) {

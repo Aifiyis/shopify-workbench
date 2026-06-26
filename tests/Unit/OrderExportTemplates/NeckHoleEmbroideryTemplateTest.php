@@ -160,6 +160,44 @@ class NeckHoleEmbroideryTemplateTest extends TestCase
         $this->assertSame("第一行：OWU\n第二行：Ohio Wesleyan University", $this->valueForHeader($template, $row, '领口信息'));
     }
 
+    public function test_qk0007_maps_heart_text_names_with_heart_note_and_uploaded_left_logo()
+    {
+        $template = new NeckHoleEmbroideryTemplate();
+        $skuImageResolver = new class {
+            public function resolve($cleanedSku, $optionName, $optionValue)
+            {
+                if ($optionName === 'Upload Your Photo/Logo (Left Sleeve)' && $optionValue === 'custom-logo.png') {
+                    return 'https://example.test/custom-logo.png';
+                }
+
+                return '';
+            }
+        };
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-6',
+            'sku' => 'RAW-CS-QK0007-CX',
+            'cleaned_sku' => 'CS-QK0007-CX',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'Left Heart text: Left Love',
+                'Right Heart text: Right Love',
+                'Choose Embroidery Icon #Left Sleeve: Names with Heart',
+                'Upload Your Photo/Logo (Left Sleeve): custom-logo.png',
+            ]),
+        ], [
+            'sku_option_image_resolver' => $skuImageResolver,
+        ]);
+
+        $this->assertSame('Left Love', $row[9]);
+        $this->assertStringContainsString('https://example.test/custom-logo.png', $row[10]);
+        $this->assertSame('Right Love', $row[13]);
+        $this->assertSame("\u{6587}\u{672C}\u{5728}\u{7231}\u{5FC3}\u{91CC}", $row[15]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

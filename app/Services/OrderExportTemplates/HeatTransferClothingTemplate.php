@@ -287,48 +287,7 @@ class HeatTransferClothingTemplate extends AbstractOrderExportTemplate
             return;
         }
 
-        $nameLines = $this->nameLineValues($attributes);
-
-        if (empty($nameLines)) {
-            return;
-        }
-
-        $nameBlock = implode("\n", $nameLines);
-        $this->appendFirstHeaderValue($values, ['胸口信息'], $nameBlock);
-
-        $leftSleeveIndex = $this->headerIndex('左袖信息');
-        if ($leftSleeveIndex !== null && ($values[$leftSleeveIndex] ?? '') === $nameBlock) {
-            $values[$leftSleeveIndex] = '';
-        }
-    }
-
-    private function nameLineValues(array $attributes)
-    {
-        $values = [];
-
-        foreach ($attributes as $attribute) {
-            $name = trim((string) ($attribute['name'] ?? ''));
-            $value = trim((string) ($attribute['value'] ?? ''));
-            $lowerName = strtolower($name);
-
-            if ($value === '') {
-                continue;
-            }
-
-            if (strpos($lowerName, 'icon') !== false
-                || strpos($lowerName, 'pattern') !== false
-                || strpos($lowerName, 'sleeve') !== false) {
-                continue;
-            }
-
-            if (preg_match('/\bname\s*#?\s*(\d+)\b/i', $name, $matches)) {
-                $values[(int) $matches[1]] = $name . '：' . $value;
-            }
-        }
-
-        ksort($values);
-
-        return array_values($values);
+        $this->appendNameLinesToChestInfo($values, $attributes);
     }
 
     private function applyNicknameNameCountChestInfoRules(array &$values, array $attributes)
@@ -349,23 +308,7 @@ class HeatTransferClothingTemplate extends AbstractOrderExportTemplate
             return;
         }
 
-        $lines = [];
-        $nickname = $this->firstAttributeValue($attributes, ['nickname']);
-
-        if ($nickname !== '') {
-            $lines[] = $nickname;
-        }
-
-        $nameValues = $this->nameOnlyValues($attributes);
-
-        if (!empty($nameValues)) {
-            $lines[] = $label;
-            $lines = array_merge($lines, $nameValues);
-        }
-
-        if (!empty($lines)) {
-            $this->setHeaderValue($values, '胸口信息', implode("\n", $lines));
-        }
+        $this->setNicknameNameLinesToChestInfo($values, $attributes, $label);
     }
 
     private function hasAttributeNameContaining(array $attributes, $needle)
@@ -377,35 +320,6 @@ class HeatTransferClothingTemplate extends AbstractOrderExportTemplate
         }
 
         return false;
-    }
-
-    private function nameOnlyValues(array $attributes)
-    {
-        $values = [];
-
-        foreach ($attributes as $attribute) {
-            $name = trim((string) ($attribute['name'] ?? ''));
-            $value = trim((string) ($attribute['value'] ?? ''));
-            $lowerName = strtolower($name);
-
-            if ($value === '') {
-                continue;
-            }
-
-            if (strpos($lowerName, 'icon') !== false
-                || strpos($lowerName, 'pattern') !== false
-                || strpos($lowerName, 'sleeve') !== false) {
-                continue;
-            }
-
-            if (preg_match('/\bname\s*#?\s*(\d+)\b/i', $name, $matches)) {
-                $values[(int) $matches[1]] = $value;
-            }
-        }
-
-        ksort($values);
-
-        return array_values($values);
     }
 
     private function isIgnoredOptionValue($value)

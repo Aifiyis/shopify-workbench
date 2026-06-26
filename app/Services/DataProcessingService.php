@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Services\OrderExportTemplates\OrderExportTemplateRegistry;
 use PHPExcel;
 use PHPExcel_Cell;
-use PHPExcel_Cell_DataType;
 use PHPExcel_IOFactory;
 use PHPExcel_Writer_Excel2007;
 use ZipArchive;
@@ -134,7 +133,7 @@ class DataProcessingService
         ];
 
         foreach ($headers as $index => $header) {
-            $this->writeTextCell($outputSheet, $index, 1, $header);
+            $outputSheet->setCellValueByColumnAndRow($index, 1, $header);
         }
 
         $outputRow = 2;
@@ -166,7 +165,7 @@ class DataProcessingService
         $this->ensureDirectory(dirname($outputPath));
 
         $writer = new PHPExcel_Writer_Excel2007($outputSpreadsheet);
-        $this->saveExcelWriter($writer, $outputPath);
+        $writer->save($outputPath);
         $this->cleanupTempFiles($imageTempFiles);
 
         return [
@@ -211,7 +210,7 @@ class DataProcessingService
             ];
 
             foreach ($headers as $index => $header) {
-                $this->writeTextCell($outputSheet, $index, 1, $header);
+                $outputSheet->setCellValueByColumnAndRow($index, 1, $header);
             }
 
             $highestRow = $sourceSheet->getHighestRow();
@@ -230,6 +229,7 @@ class DataProcessingService
                 $productSpecs = $this->getCellValue($sourceSheet, $sourceColumns['specs'], $row);
                 $productImage = $this->getCellValue($sourceSheet, $sourceColumns['picture'], $row);
                 $quantity = $this->getCellValue($sourceSheet, $sourceColumns['quantity'], $row);
+                $salesLink = $this->getCellValue($sourceSheet, $sourceColumns['sales_link'], $row);
 
                 if ($this->isBlank($orderId)) {
                     continue;
@@ -250,6 +250,7 @@ class DataProcessingService
                     'chinese_name' => '彩图刺绣',
                     'product_specs' => $productSpecs,
                     'product_image' => $productImage ?? '',
+                    'sales_link' => $salesLink ?? '',
                     'quantity' => $quantity ?? '',
                     'style' => $style ?? '',
                     'color' => $color ?? '',
@@ -286,7 +287,7 @@ class DataProcessingService
             $this->ensureDirectory(dirname($outputPath));
 
             $writer = new PHPExcel_Writer_Excel2007($outputSpreadsheet);
-            $this->saveExcelWriter($writer, $outputPath);
+            $writer->save($outputPath);
             $this->cleanupTempFiles($imageTempFiles);
             $this->cleanupTempPaths($embeddedImages['paths']);
 
@@ -341,11 +342,10 @@ class DataProcessingService
         $skuColumn = $sourceColumns['sku'];
         $pictureColumn = $sourceColumns['picture'];
 
-        $this->writeTextCell($outputSheet, 0, 1, '导表日期');
+        $outputSheet->setCellValueByColumnAndRow(0, 1, '导表日期');
 
         for ($column = 0; $column < $sourceColumnCount; $column++) {
-            $this->writeTextCell(
-                $outputSheet,
+            $outputSheet->setCellValueByColumnAndRow(
                 $column + 1,
                 1,
                 $this->getCellValue($sourceSheet, $column, 1)
@@ -353,7 +353,7 @@ class DataProcessingService
         }
 
         foreach (['中文名称', '工艺', '处理人', '上品人'] as $offset => $header) {
-            $this->writeTextCell($outputSheet, $appendStartColumn + $offset, 1, $header);
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + $offset, 1, $header);
         }
 
         $outputRow = 2;
@@ -369,8 +369,9 @@ class DataProcessingService
             $productSpecs = $this->getCellValue($sourceSheet, $sourceColumns['specs'], $row);
             $productImage = $this->getCellValue($sourceSheet, $pictureColumn, $row);
             $quantity = $this->getCellValue($sourceSheet, $sourceColumns['quantity'], $row);
+            $salesLink = $this->getCellValue($sourceSheet, $sourceColumns['sales_link'], $row);
 
-            $this->writeTextCell($outputSheet, 0, $outputRow, $filenameKey);
+            $outputSheet->setCellValueByColumnAndRow(0, $outputRow, $filenameKey);
 
             for ($column = 0; $column < $sourceColumnCount; $column++) {
                 $value = $this->getCellValue($sourceSheet, $column, $row);
@@ -380,13 +381,13 @@ class DataProcessingService
                     continue;
                 }
 
-                $this->writeTextCell($outputSheet, $column + 1, $outputRow, $value);
+                $outputSheet->setCellValueByColumnAndRow($column + 1, $outputRow, $value);
             }
 
-            $this->writeTextCell($outputSheet, $appendStartColumn, $outputRow, $chineseName);
-            $this->writeTextCell($outputSheet, $appendStartColumn + 1, $outputRow, $resolvedSku['工艺'] ?? '');
-            $this->writeTextCell($outputSheet, $appendStartColumn + 2, $outputRow, $resolvedSku['处理人'] ?? '');
-            $this->writeTextCell($outputSheet, $appendStartColumn + 3, $outputRow, $resolvedSku['上品人'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn, $outputRow, $chineseName);
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 1, $outputRow, $resolvedSku['工艺'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 2, $outputRow, $resolvedSku['处理人'] ?? '');
+            $outputSheet->setCellValueByColumnAndRow($appendStartColumn + 3, $outputRow, $resolvedSku['上品人'] ?? '');
 
             $templateCandidateRows[] = [
                 'filename_key' => $filenameKey,
@@ -397,6 +398,7 @@ class DataProcessingService
                 'chinese_name' => $chineseName,
                 'product_specs' => $productSpecs,
                 'product_image' => $productImage,
+                'sales_link' => $salesLink,
                 'quantity' => $quantity,
                 'style' => $this->lookupService->matchStyle($sku, $styleLookup) ?? '',
                 'color' => $this->lookupService->matchColor($productSpecs, $colorLookup) ?? '',
@@ -422,7 +424,7 @@ class DataProcessingService
         $this->ensureDirectory(dirname($outputPath));
 
         $writer = new PHPExcel_Writer_Excel2007($outputSpreadsheet);
-        $this->saveExcelWriter($writer, $outputPath);
+        $writer->save($outputPath);
         $this->cleanupTempFiles($imageTempFiles);
 
         return [
@@ -504,6 +506,7 @@ class DataProcessingService
             'specs' => null,
             'picture' => null,
             'quantity' => null,
+            'sales_link' => null,
         ];
 
         $highestColumn = $sheet->getHighestColumn();
@@ -546,6 +549,14 @@ class DataProcessingService
                 || strpos($rawHeaderValue, '数量') !== false
             ) {
                 $indices['quantity'] = $column;
+            } elseif (
+                (strpos($headerValue, 'sales') !== false && strpos($headerValue, 'link') !== false)
+                || (strpos($headerValue, 'product') !== false && strpos($headerValue, 'link') !== false)
+                || strpos($headerValue, 'product url') !== false
+                || strpos($rawHeaderValue, '销售链接') !== false
+                || strpos($rawHeaderValue, '产品链接') !== false
+            ) {
+                $indices['sales_link'] = $column;
             }
         }
 
@@ -695,52 +706,6 @@ class DataProcessingService
     private function getIntermediateFilePath($filename)
     {
         return storage_path('app/temp/processed_files/' . uniqid('run_', true) . '/' . $filename);
-    }
-
-    private function saveExcelWriter(PHPExcel_Writer_Excel2007 $writer, $outputPath)
-    {
-        $this->ensureDirectory(dirname($outputPath));
-        $temporaryPath = $this->createTemporaryPath('excel_', '.xlsx');
-
-        try {
-            $writer->save($temporaryPath);
-
-            if (!copy($temporaryPath, $outputPath)) {
-                throw new \Exception("Unable to copy Excel file to: {$outputPath}");
-            }
-        } finally {
-            if (file_exists($temporaryPath)) {
-                @unlink($temporaryPath);
-            }
-        }
-    }
-
-    private function createTemporaryPath($prefix, $extension)
-    {
-        $temporaryPath = tempnam(sys_get_temp_dir(), $prefix);
-
-        if ($temporaryPath === false) {
-            throw new \Exception('Unable to create temporary file.');
-        }
-
-        $pathWithExtension = $temporaryPath . $extension;
-
-        if (!rename($temporaryPath, $pathWithExtension)) {
-            @unlink($temporaryPath);
-            throw new \Exception('Unable to create temporary file with extension.');
-        }
-
-        return $pathWithExtension;
-    }
-
-    private function writeTextCell($sheet, $column, $row, $value)
-    {
-        $sheet->setCellValueExplicitByColumnAndRow(
-            $column,
-            $row,
-            (string) $value,
-            PHPExcel_Cell_DataType::TYPE_STRING
-        );
     }
 
     private function ensureDirectory($directory)
@@ -1068,7 +1033,7 @@ class DataProcessingService
         if ($this->shouldRenderImageColumn($headers, $column)) {
             $this->setCellValueOrImage($sheet, $column, $row, $value, $imageTempFiles, $embeddedImagePath);
         } else {
-            $this->writeTextCell($sheet, $column, $row, $value);
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
         }
 
         if ($this->shouldWrapTemplateColumn($headers, $column, $value)) {
@@ -1083,7 +1048,7 @@ class DataProcessingService
         $value = trim((string) $value);
 
         if ($this->isStandaloneNoThanksImageReference($value)) {
-            $this->writeTextCell($sheet, $column, $row, '');
+            $sheet->setCellValueByColumnAndRow($column, $row, '');
             return;
         }
 
@@ -1113,14 +1078,14 @@ class DataProcessingService
         }
 
         if (!$this->isImageUrl($value)) {
-            $this->writeTextCell($sheet, $column, $row, $value);
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
             return;
         }
 
         $imagePath = $this->downloadImageForExcel($value, $imageTempFiles);
 
         if ($imagePath === null) {
-            $this->writeTextCell($sheet, $column, $row, $value);
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
             return;
         }
 
@@ -1130,7 +1095,7 @@ class DataProcessingService
     private function setCellValueWithMixedImages($sheet, $column, $row, $value, array $imageReferences, array &$imageTempFiles)
     {
         $text = $this->stripImageReferencesFromText($value, $imageReferences);
-        $this->writeTextCell($sheet, $column, $row, $text);
+        $sheet->setCellValueByColumnAndRow($column, $row, $text);
         $sheet->getStyleByColumnAndRow($column, $row)->getAlignment()->setWrapText(true);
 
         $inserted = 0;
@@ -1153,7 +1118,7 @@ class DataProcessingService
         }
 
         if ($inserted === 0) {
-            $this->writeTextCell($sheet, $column, $row, $value);
+            $sheet->setCellValueByColumnAndRow($column, $row, $value);
             return;
         }
 
@@ -1175,7 +1140,7 @@ class DataProcessingService
         $drawing->setWorksheet($sheet);
 
         if ($clearCell) {
-            $this->writeTextCell($sheet, $column, $row, '');
+            $sheet->setCellValueByColumnAndRow($column, $row, '');
         }
 
         $sheet->getRowDimension($row)->setRowHeight(max($sheet->getRowDimension($row)->getRowHeight(), $height - 10));
@@ -1616,7 +1581,6 @@ class DataProcessingService
     {
         $archiveFilename = $this->generateArchiveFilename($filenameKey);
         $archivePath = $this->getProcessedFilePath($archiveFilename);
-        $temporaryPath = $this->createTemporaryPath('archive_', '.zip');
         $this->ensureDirectory(dirname($archivePath));
 
         if (file_exists($archivePath)) {
@@ -1625,29 +1589,15 @@ class DataProcessingService
 
         $zip = new ZipArchive();
 
-        try {
-            if ($zip->open($temporaryPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-                throw new \Exception("Unable to create archive: {$temporaryPath}");
-            }
-
-            foreach ($outputFiles as $file) {
-                if (!$zip->addFile($file['path'], $file['filename'])) {
-                    throw new \Exception("Unable to add file to archive: {$file['path']}");
-                }
-            }
-
-            if ($zip->close() === false) {
-                throw new \Exception("Unable to close archive: {$temporaryPath}");
-            }
-
-            if (!copy($temporaryPath, $archivePath)) {
-                throw new \Exception("Unable to copy archive to: {$archivePath}");
-            }
-        } finally {
-            if (file_exists($temporaryPath)) {
-                @unlink($temporaryPath);
-            }
+        if ($zip->open($archivePath, ZipArchive::CREATE) !== true) {
+            throw new \Exception("Unable to create archive: {$archivePath}");
         }
+
+        foreach ($outputFiles as $file) {
+            $zip->addFile($file['path'], $file['filename']);
+        }
+
+        $zip->close();
 
         return [
             'filename' => $archiveFilename,
@@ -1687,6 +1637,10 @@ class DataProcessingService
             if ($header === 'sku' || $header === 'cleaned_sku') {
                 $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(22);
             }
+
+            if ($header === '产品链接') {
+                $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(35);
+            }
         }
     }
 
@@ -1698,7 +1652,7 @@ class DataProcessingService
 
         $header = (string) $headers[$column];
 
-        if ($header === 'sku' || $header === 'cleaned_sku') {
+        if ($header === 'sku' || $header === 'cleaned_sku' || $header === '产品链接') {
             return false;
         }
 

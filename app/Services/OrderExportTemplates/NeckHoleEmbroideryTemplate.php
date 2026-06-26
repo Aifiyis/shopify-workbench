@@ -90,7 +90,7 @@ class NeckHoleEmbroideryTemplate extends AbstractOrderExportTemplate
         }
 
         if ($this->isQk0007($row)) {
-            $this->applyQk0007CollegeTeamLogoRules($values, $attributes, $context);
+            $this->applyQk0007CollegeTeamLogoRules($values, $attributes, $row, $context);
         }
 
         if ($this->isQk4010($row)) {
@@ -121,12 +121,32 @@ class NeckHoleEmbroideryTemplate extends AbstractOrderExportTemplate
         }
     }
 
-    private function applyQk0007CollegeTeamLogoRules(array &$values, array $attributes, array $context)
+    private function applyQk0007CollegeTeamLogoRules(array &$values, array $attributes, array $row, array $context)
     {
         foreach ($attributes as $index => $attribute) {
+            $name = trim((string) ($attribute['name'] ?? ''));
             $lowerName = strtolower(trim((string) ($attribute['name'] ?? '')));
             $value = trim((string) ($attribute['value'] ?? ''));
             $lowerValue = strtolower($value);
+
+            if ($value === '') {
+                continue;
+            }
+
+            if (strpos($lowerValue, 'names with heart') !== false) {
+                $values[15] = "\u{6587}\u{672C}\u{5728}\u{7231}\u{5FC3}\u{91CC}";
+            }
+
+            if (strcasecmp($name, 'Left Heart text') === 0) {
+                $this->appendSleeveInfo($values, 'left', $value);
+            } elseif (strcasecmp($name, 'Right Heart text') === 0) {
+                $this->appendSleeveInfo($values, 'right', $value);
+            }
+
+            if (strpos($lowerName, 'upload your photo/logo') !== false && $this->sleeveTargetFromText($lowerName) === 'left') {
+                $image = $this->resolveOptionImage($context, $row, $name, $value);
+                $this->appendSleeveIcon($values, 'left', $image !== '' ? $image : $value);
+            }
 
             if (strpos($lowerName, 'embroidery icon') === false) {
                 continue;
@@ -277,6 +297,24 @@ class NeckHoleEmbroideryTemplate extends AbstractOrderExportTemplate
             $this->setHeaderValue($values, '左袖信息', $value);
         } elseif ($target === 'right') {
             $this->setHeaderValue($values, '右袖信息', $value);
+        }
+    }
+
+    private function appendSleeveInfo(array &$values, $target, $value)
+    {
+        if ($target === 'left') {
+            $this->appendIndexedValue($values, 9, $value);
+        } elseif ($target === 'right') {
+            $this->appendIndexedValue($values, 13, $value);
+        }
+    }
+
+    private function appendIndexedValue(array &$values, $index, $value)
+    {
+        if (($values[$index] ?? '') === '') {
+            $values[$index] = $value;
+        } else {
+            $values[$index] .= "\n" . $value;
         }
     }
 }
