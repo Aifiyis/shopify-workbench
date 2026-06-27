@@ -17,6 +17,10 @@ class ProductProcessingCraft extends Model
         'order_processor' => '订单处理人',
         'artwork_processor' => '图画处理人',
         'procurement_processor' => '采购处理人',
+        'order_processor_employee_id' => '订单处理人',
+        'artwork_processor_employee_id' => '图画处理人',
+        'procurement_processor_employee_id' => '采购处理人',
+        'settlement_method' => '结算方式',
         'spreadsheet_template' => '表格模板',
         'spreadsheet_template_description' => '表格模板说明',
     ];
@@ -28,6 +32,10 @@ class ProductProcessingCraft extends Model
         'order_processor',
         'artwork_processor',
         'procurement_processor',
+        'order_processor_employee_id',
+        'artwork_processor_employee_id',
+        'procurement_processor_employee_id',
+        'settlement_method',
         'spreadsheet_template',
         'spreadsheet_template_description',
     ];
@@ -45,5 +53,20 @@ class ProductProcessingCraft extends Model
     public function productType()
     {
         return $this->belongsTo(ProductType::class);
+    }
+
+    public function orderProcessorEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'order_processor_employee_id');
+    }
+
+    public function artworkProcessorEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'artwork_processor_employee_id');
+    }
+
+    public function procurementProcessorEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'procurement_processor_employee_id');
     }
 }

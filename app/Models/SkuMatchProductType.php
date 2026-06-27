@@ -16,6 +16,7 @@ class SkuMatchProductType extends Model
         'cleaned_sku' => '清洗后的SKU',
         'chinese_name' => '中文名称',
         'product_lister' => '上品人',
+        'product_lister_employee_id' => '上品人',
     ];
 
     protected $fillable = [
@@ -24,6 +25,7 @@ class SkuMatchProductType extends Model
         'product_type_id',
         'chinese_name',
         'product_lister',
+        'product_lister_employee_id',
     ];
 
     public function processingCraft()
@@ -34,5 +36,10 @@ class SkuMatchProductType extends Model
     public function productType()
     {
         return $this->belongsTo(ProductType::class);
+    }
+
+    public function productListerEmployee()
+    {
+        return $this->belongsTo(Employee::class, 'product_lister_employee_id');
     }
 }
