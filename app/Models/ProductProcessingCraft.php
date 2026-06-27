@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProductProcessingCraft extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'product_processing_craft';
 
     public const FIELD_LABELS = [
@@ -20,6 +23,7 @@ class ProductProcessingCraft extends Model
 
     protected $fillable = [
         'chinese_name',
+        'product_type_id',
         'craft_id',
         'order_processor',
         'artwork_processor',
@@ -36,5 +40,10 @@ class ProductProcessingCraft extends Model
     public function skuMatches()
     {
         return $this->hasMany(SkuMatchProductType::class, 'chinese_name', 'chinese_name');
+    }
+
+    public function productType()
+    {
+        return $this->belongsTo(ProductType::class);
     }
 }

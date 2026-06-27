@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProcessingCraftNode extends Model
 {
+    use SoftDeletes;
+
     public const FIELD_LABELS = [
         'parent_id' => '上级工艺',
         'name' => '工艺节点名称',
