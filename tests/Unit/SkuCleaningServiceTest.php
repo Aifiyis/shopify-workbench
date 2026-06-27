@@ -32,6 +32,20 @@ class SkuCleaningServiceTest extends TestCase
         file_put_contents($this->tempDirectory . '/sku-exclude-values.json', json_encode([
             'all_exclude_values' => ['Red', 'Blue', 'XL'],
         ], JSON_UNESCAPED_UNICODE));
+
+        file_put_contents($this->tempDirectory . '/sku-exclude-rule-patterns.json', json_encode([
+            'include_type' => [
+                'fields' => [
+                    [
+                        'value' => 'kid',
+                        'regex' => '/kid/iu',
+                    ],
+                ],
+            ],
+            'equals_type' => [
+                'fields' => [],
+            ],
+        ], JSON_UNESCAPED_UNICODE));
     }
 
     protected function tearDown(): void
@@ -69,6 +83,24 @@ class SkuCleaningServiceTest extends TestCase
         $this->assertSame('ANY-QK2000', $result['cleaned_sku']);
         $this->assertSame('袖口刺绣', $result['excel_category']);
         $this->assertSame('袖口刺绣', $result['type']);
+    }
+
+    public function test_cleans_sku_with_values_before_applying_rule_patterns()
+    {
+        file_put_contents($this->tempDirectory . '/sku-exclude-values.json', json_encode([
+            'all_exclude_values' => ['Beige'],
+        ], JSON_UNESCAPED_UNICODE));
+
+        $service = new SkuCleaningService(
+            $this->tempDirectory . '/sku-cleaned.json',
+            $this->tempDirectory . '/sku-exclude-values.json',
+            $this->tempDirectory . '/sku-exclude-rule-patterns.json'
+        );
+
+        $this->assertSame(
+            'ACC-QK6713-CX',
+            $service->cleanSkuUsingValuesAndPatterns('ACC-QK6713-Beige/50-kid-CX')
+        );
     }
 
     private function deleteDirectory($directory)

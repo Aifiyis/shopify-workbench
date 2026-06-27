@@ -6,14 +6,17 @@ class SkuCleaningService
 {
     private $skuCleanedPath;
     private $excludeValuesPath;
+    private $excludeRulePatternsPath;
     private $originalLookup = null;
     private $cleanedLookup = null;
     private $excludeValues = null;
+    private $excludeRulePatterns = null;
 
-    public function __construct($skuCleanedPath = null, $excludeValuesPath = null)
+    public function __construct($skuCleanedPath = null, $excludeValuesPath = null, $excludeRulePatternsPath = null)
     {
         $this->skuCleanedPath = $skuCleanedPath ?: storage_path('app/private/sku-cleaned.json');
         $this->excludeValuesPath = $excludeValuesPath ?: storage_path('app/private/sku-exclude-values.json');
+        $this->excludeRulePatternsPath = $excludeRulePatternsPath ?: storage_path('app/private/sku-exclude-rule-patterns.json');
     }
 
     public function resolve($sku)
@@ -66,6 +69,56 @@ class SkuCleaningService
             }
 
             if ($this->matchesExcludeValue($part, $excludeValues)) {
+                continue;
+            }
+
+            $keptParts[] = $part;
+        }
+
+        $cleanedSku = implode('-', array_filter($keptParts, function ($part) {
+            return $part !== '';
+        }));
+
+        return $cleanedSku === '' ? (string) $sku : $cleanedSku;
+    }
+
+    public function cleanSkuUsingValuesAndPatterns($sku)
+    {
+        return $this->cleanSkuByRulePatterns($this->cleanSku($sku));
+    }
+
+    private function cleanSkuByRulePatterns($sku)
+    {
+        $parts = explode('-', (string) $sku);
+        $keptParts = [];
+        $rules = $this->loadExcludeRulePatterns();
+
+        if (count($parts) >= 1) {
+            $keptParts[] = trim((string) $parts[0]);
+        }
+
+        if (count($parts) >= 2) {
+            $keptParts[] = trim((string) $parts[1]);
+        }
+
+        for ($i = 2; $i < count($parts); $i++) {
+            $part = trim((string) $parts[$i]);
+
+            if ($part === '') {
+                continue;
+            }
+
+            if ($this->shouldAlwaysKeepSkuPart($part)) {
+                $keptParts[] = $part;
+                continue;
+            }
+
+            if ($this->isTShirtPart($part, $parts, $i)) {
+                $i++;
+                continue;
+            }
+
+            if ($this->matchesExcludeRulePatterns($part, $rules)) {
                 continue;
             }
 
@@ -153,6 +206,55 @@ class SkuCleaningService
         return $this->excludeValues;
     }
 
+    private function loadExcludeRulePatterns()
+    {
+        if ($this->excludeRulePatterns !== null) {
+            return $this->excludeRulePatterns;
+        }
+
+        $this->excludeRulePatterns = $this->readJsonArray($this->excludeRulePatternsPath);
+
+        return $this->excludeRulePatterns;
+    }
+
+    private function matchesExcludeRulePatterns($part, array $rules)
+    {
+        foreach ($rules['equals_type']['fields'] ?? [] as $field) {
+            if ($this->matchesRuleField($part, $field, true)) {
+                return true;
+            }
+        }
+
+        foreach ($rules['include_type']['fields'] ?? [] as $field) {
+            if ($this->matchesRuleField($part, $field, false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function matchesRuleField($part, array $field, $equalsOnly)
+    {
+        $regex = $field['regex'] ?? null;
+
+        if (is_string($regex) && $regex !== '' && @preg_match($regex, '') !== false) {
+            return preg_match($regex, (string) $part) === 1;
+        }
+
+        $value = trim((string) ($field['value'] ?? ''));
+
+        if ($value === '') {
+            return false;
+        }
+
+        if ($equalsOnly) {
+            return strcasecmp(trim((string) $part), $value) === 0;
+        }
+
+        return stripos((string) $part, $value) !== false;
+    }
+
     private function readJsonArray($path)
     {
         if (!file_exists($path)) {
@@ -220,7 +322,7 @@ class SkuCleaningService
             '3734',
             '6315',
             'QK1311',
-            'WW24090702',
+            'WW24090702'
         ];
     }
 }
