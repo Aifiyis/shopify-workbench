@@ -122,16 +122,14 @@ class BusinessDataBackfillService
     private function assignManagerPermissions(array $permissions): void
     {
         foreach ($permissions as $permission) {
-            DB::table('role_permission')->updateOrInsert(
+            DB::table('role_permission')->insertOrIgnore([
                 [
                     'role' => 'manager',
                     'permission_id' => $permission->id,
-                ],
-                [
                     'updated_at' => now(),
                     'created_at' => now(),
-                ]
-            );
+                ],
+            ]);
         }
     }
 

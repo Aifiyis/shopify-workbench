@@ -172,6 +172,36 @@ class BusinessDataBackfillServiceTest extends TestCase
         $this->assertSame($countsAfterFirstRun, $this->businessCounts());
     }
 
+    public function test_rerun_preserves_existing_manager_permission_timestamps()
+    {
+        $service = app(BusinessDataBackfillService::class);
+        $service->run();
+
+        $permissionId = Permission::where('code', 'sku_product_types.manage')->value('id');
+        DB::table('role_permission')
+            ->where('role', 'manager')
+            ->where('permission_id', $permissionId)
+            ->update([
+                'created_at' => '2020-01-02 03:04:05',
+                'updated_at' => '2020-01-02 03:04:05',
+            ]);
+
+        $before = DB::table('role_permission')
+            ->where('role', 'manager')
+            ->where('permission_id', $permissionId)
+            ->first();
+
+        $service->run();
+
+        $after = DB::table('role_permission')
+            ->where('role', 'manager')
+            ->where('permission_id', $permissionId)
+            ->first();
+
+        $this->assertSame($before->created_at, $after->created_at);
+        $this->assertSame($before->updated_at, $after->updated_at);
+    }
+
     private function assertPositionPermissions($positionCode, array $permissionCodes)
     {
         $actual = Position::where('code', $positionCode)
