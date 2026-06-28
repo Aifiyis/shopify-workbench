@@ -37,7 +37,7 @@ class OrderController extends Controller
         // 验证权限
         $store = ShopifyStore::findOrFail($storeId);
         if (!$admin->canAccessStore($storeId)) {
-            abort(403, 'Unauthorized access to this store');
+            abort(403, '无权访问此店铺');
         }
 
         // 获取日期范围
@@ -69,7 +69,7 @@ class OrderController extends Controller
 
         // 验证权限
         if (!$admin->canAccessStore($storeId)) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            return response()->json(['success' => false, 'message' => '无权执行此操作'], 403);
         }
 
         $store = ShopifyStore::findOrFail($storeId);
@@ -83,13 +83,13 @@ class OrderController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Orders refreshed successfully',
+                'message' => '订单刷新成功',
                 'count' => count($orders),
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to refresh orders: ' . $e->getMessage(),
+                'message' => '刷新订单失败：' . $e->getMessage(),
             ], 500);
         }
     }
@@ -106,7 +106,7 @@ class OrderController extends Controller
 
         // 验证权限
         if (!$admin->canAccessStore($storeId)) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            return response()->json(['success' => false, 'message' => '无权执行此操作'], 403);
         }
 
         try {
@@ -122,7 +122,7 @@ class OrderController extends Controller
             if ($orders->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No orders found for the selected date range',
+                    'message' => '所选日期范围内没有订单',
                 ], 404);
             }
 
@@ -140,7 +140,7 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to export orders: ' . $e->getMessage(),
+                'message' => '导出订单失败：' . $e->getMessage(),
             ], 500);
         }
     }

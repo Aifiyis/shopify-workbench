@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>千兴工作台</title>
+    <title>@yield('title', '千兴工作台')</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css">
     @if (file_exists(public_path('mix-manifest.json')) && file_exists(public_path('css/app.css')))
         <link rel="stylesheet" href="{{ mix('/css/app.css') }}">

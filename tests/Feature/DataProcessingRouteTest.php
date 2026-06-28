@@ -20,7 +20,7 @@ class DataProcessingRouteTest extends TestCase
         $response = $this->get('/data-processing/upload');
 
         $response->assertRedirect(route('data-processing.index'));
-        $response->assertSessionHas('error');
+        $response->assertSessionHas('error', '请在数据处理页面选择文件，并点击“处理文件”上传。');
     }
 
     public function test_post_upload_without_file_redirects_to_upload_page_with_clear_error()
@@ -30,7 +30,7 @@ class DataProcessingRouteTest extends TestCase
         $response = $this->post('/data-processing/upload', []);
 
         $response->assertRedirect(route('data-processing.index'));
-        $response->assertSessionHas('error');
+        $response->assertSessionHas('error', '未收到上传文件。请重新选择文件后上传；如果问题反复出现，文件可能超过 PHP 上传大小限制。');
     }
 
     public function test_post_upload_starts_background_processing_instead_of_processing_during_request()

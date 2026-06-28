@@ -66,7 +66,7 @@ class DataProcessingController extends Controller
             ]);
 
             return redirect()->route('data-processing.index')
-                ->with('error', 'No uploaded file was received by PHP. Please reselect the file and upload again; if it repeats, the file may exceed the web PHP upload limit.');
+                ->with('error', '未收到上传文件。请重新选择文件后上传；如果问题反复出现，文件可能超过 PHP 上传大小限制。');
         }
 
         $request->validate([
@@ -76,7 +76,7 @@ class DataProcessingController extends Controller
         $extension = strtolower($request->file('file')->getClientOriginalExtension());
         if (!in_array($extension, ['xlsx', 'xls', 'csv'], true)) {
             return redirect()->back()
-                ->withErrors(['file' => 'The file must be a file of type: xlsx, xls, csv.'])
+                ->withErrors(['file' => '文件类型必须为 xlsx、xls 或 csv。'])
                 ->withInput();
         }
 
@@ -106,7 +106,7 @@ class DataProcessingController extends Controller
             $this->dataProcessingUploadDispatcher->dispatch($processedFile->id);
 
             return redirect()->route('data-processing.index')
-                ->with('success', 'File uploaded successfully. Processing has started; refresh this page in a moment to download the order excel exported zip.');
+                ->with('success', '文件上传成功，已开始处理。请稍后刷新页面，下载订单 Excel 导出压缩包。');
         } catch (\Exception $e) {
             if ($processedFile) {
                 $processedFile->update([
@@ -117,7 +117,7 @@ class DataProcessingController extends Controller
 
             \Log::error('File upload processing failed: ' . $e->getMessage());
             return redirect()->back()
-                ->with('error', 'An error occurred while processing the file: ' . $e->getMessage());
+                ->with('error', '处理文件时发生错误：' . $e->getMessage());
         }
     }
 
@@ -129,17 +129,17 @@ class DataProcessingController extends Controller
             ->firstOrFail();
 
         if ($processedFile->status !== 'completed') {
-            abort(409, 'File is not ready for download');
+            abort(409, '文件尚未处理完成，暂时无法下载');
         }
 
         // Check if file is expired
         if ($processedFile->isExpired()) {
-            abort(410, 'File has expired and is no longer available');
+            abort(410, '文件已过期，无法继续下载');
         }
 
         // Check if file exists
         if (!file_exists($processedFile->file_path)) {
-            abort(404, 'File not found');
+            abort(404, '未找到文件');
         }
 
         // Mark as downloaded
@@ -164,6 +164,6 @@ class DataProcessingController extends Controller
         $processedFile->delete();
 
         return redirect()->route('data-processing.index')
-            ->with('success', 'File deleted successfully');
+            ->with('success', '文件删除成功');
     }
 }

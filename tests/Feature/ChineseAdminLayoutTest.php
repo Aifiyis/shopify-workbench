@@ -24,6 +24,7 @@ class ChineseAdminLayoutTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('<html lang="zh-CN">', false);
+        $response->assertSee('<title>工作台 - 千兴工作台</title>', false);
         $response->assertSeeText('千兴工作台');
         $response->assertSeeText('工作台');
         $response->assertSeeText('数据处理');

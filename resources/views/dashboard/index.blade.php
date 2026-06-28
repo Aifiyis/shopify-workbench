@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - Shopify Workbench')
+@section('title', '工作台 - 千兴工作台')
 
 @section('content')
 <style>
@@ -33,7 +33,7 @@
     .store-card {
         background: white;
         padding: 20px;
-        border-radius: 10px;
+        border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         cursor: pointer;
         transition: all 0.3s;
@@ -82,7 +82,7 @@
         text-align: center;
         padding: 50px;
         background: white;
-        border-radius: 10px;
+        border-radius: 8px;
     }
 
     .empty-state p {
@@ -93,13 +93,13 @@
 
 <div class="dashboard-container">
     <div class="dashboard-header">
-        <h2>Select a Store</h2>
-        <p>Choose a store to manage reports</p>
+        <h2>选择店铺</h2>
+        <p>选择要处理数据的店铺</p>
     </div>
 
     @if ($stores->isEmpty())
         <div class="empty-state">
-            <p>No stores available. Please contact the administrator.</p>
+            <p>暂无可用店铺，请联系管理员。</p>
         </div>
     @else
         <div class="stores-grid">
@@ -108,7 +108,7 @@
                     <div class="store-name">{{ $store->shop_name }}</div>
                     <div class="store-url">{{ $store->shop_url }}</div>
                     <div class="store-status {{ $store->is_active ? 'status-active' : 'status-inactive' }}">
-                        {{ $store->is_active ? 'Active' : 'Inactive' }}
+                        {{ $store->is_active ? '启用' : '停用' }}
                     </div>
                 </a>
             @endforeach

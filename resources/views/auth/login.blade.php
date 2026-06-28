@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Shopify Workbench</title>
+    <title>管理员登录 - 千兴工作台</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f3f4f6;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -23,8 +23,9 @@
         .login-container {
             background: white;
             padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             width: 100%;
             max-width: 400px;
         }
@@ -68,8 +69,8 @@
 
         .form-group input:focus {
             outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            border-color: #4b5563;
+            box-shadow: 0 0 0 3px rgba(75, 85, 99, 0.1);
         }
 
         .form-group input.error {
@@ -102,23 +103,18 @@
         .btn-login {
             width: 100%;
             padding: 12px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #374151;
             color: white;
             border: none;
             border-radius: 5px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
+            transition: background-color 0.2s;
         }
 
         .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-login:active {
-            transform: translateY(0);
+            background: #1f2937;
         }
 
         .alert {
@@ -138,8 +134,8 @@
 <body>
     <div class="login-container">
         <div class="login-header">
-            <h1>Shopify Workbench</h1>
-            <p>Admin Portal</p>
+            <h1>千兴工作台</h1>
+            <p>管理员登录</p>
         </div>
 
         @if ($errors->any())
@@ -154,7 +150,7 @@
             @csrf
 
             <div class="form-group">
-                <label for="email">Email Address</label>
+                <label for="email">邮箱</label>
                 <input
                     type="email"
                     id="email"
@@ -170,7 +166,7 @@
             </div>
 
             <div class="form-group">
-                <label for="password">Password</label>
+                <label for="password">密码</label>
                 <input
                     type="password"
                     id="password"
@@ -185,10 +181,10 @@
 
             <div class="form-check">
                 <input type="checkbox" id="remember" name="remember" value="1">
-                <label for="remember">Remember me</label>
+                <label for="remember">记住我</label>
             </div>
 
-            <button type="submit" class="btn-login">Sign In</button>
+            <button type="submit" class="btn-login">登录</button>
         </form>
     </div>
 </body>

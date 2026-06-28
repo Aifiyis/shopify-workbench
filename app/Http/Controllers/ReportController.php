@@ -51,7 +51,7 @@ class ReportController extends Controller
 
         return redirect()
             ->route('reports.index', ['store_id' => $store->id])
-            ->with('status', 'Report saved.');
+            ->with('status', '报表保存成功。');
     }
 
     public function edit(Request $request, $report)
@@ -76,7 +76,7 @@ class ReportController extends Controller
 
         return redirect()
             ->route('reports.index', ['store_id' => $store->id])
-            ->with('status', 'Report updated.');
+            ->with('status', '报表更新成功。');
     }
 
     public function schedule(Request $request, $report)
@@ -105,7 +105,7 @@ class ReportController extends Controller
 
         return redirect()
             ->route('reports.schedule', ['report' => $report, 'store_id' => $store->id, 'tab' => 'actual'])
-            ->with('status', 'Schedule saved.');
+            ->with('status', '计划保存成功。');
     }
 
     private function resolveStore(Request $request): ShopifyStore
@@ -115,7 +115,7 @@ class ReportController extends Controller
         $admin = Auth::guard('admin')->user();
 
         if (!$admin->canAccessStore($storeId)) {
-            abort(403, 'Unauthorized access to this store');
+            abort(403, '无权访问此店铺');
         }
 
         return $store;
@@ -143,7 +143,7 @@ class ReportController extends Controller
                 'slug' => 'factory',
                 'name' => 'factory',
                 'description' => '',
-                'created_on' => 'Nov 10, 2024 01:00',
+                'created_on' => '2024-11-10 01:00',
                 'scheduled' => ['active' => 1, 'inactive' => 0],
                 'fields' => $this->defaultSelectedFields(),
             ],
@@ -151,7 +151,7 @@ class ReportController extends Controller
                 'slug' => 'shipping',
                 'name' => 'shipping',
                 'description' => '',
-                'created_on' => 'Nov 9, 2024 23:42',
+                'created_on' => '2024-11-09 23:42',
                 'scheduled' => null,
                 'fields' => ['Order Name', 'Order Date', 'Product Title', 'Quantity', 'SKU'],
             ],
@@ -159,7 +159,7 @@ class ReportController extends Controller
                 'slug' => 'de_order_with_image',
                 'name' => 'de_order_with_image',
                 'description' => '',
-                'created_on' => 'Nov 24, 2022 09:53',
+                'created_on' => '2022-11-24 09:53',
                 'scheduled' => ['active' => 1, 'inactive' => 1],
                 'fields' => $this->defaultSelectedFields(),
             ],
@@ -167,7 +167,7 @@ class ReportController extends Controller
                 'slug' => 'information',
                 'name' => 'information',
                 'description' => '',
-                'created_on' => 'May 19, 2020 13:25',
+                'created_on' => '2020-05-19 13:25',
                 'scheduled' => null,
                 'fields' => ['Order Name', 'Email', 'Product Title', 'Product Tags'],
             ],
@@ -187,15 +187,15 @@ class ReportController extends Controller
 
     private function reportFromRequest(Request $request, ?string $existingSlug): array
     {
-        $name = trim($request->input('name', 'Untitled report'));
+        $name = trim($request->input('name', '未命名报表'));
         $slug = $existingSlug ?: strtolower(preg_replace('/[^A-Za-z0-9]+/', '_', $name));
         $slug = trim($slug, '_') ?: 'untitled_report';
 
         return [
             'slug' => $slug,
-            'name' => $name ?: 'Untitled report',
+            'name' => $name ?: '未命名报表',
             'description' => trim($request->input('description', '')),
-            'created_on' => now()->format('M j, Y H:i'),
+            'created_on' => now()->format('Y-m-d H:i'),
             'scheduled' => null,
             'fields' => array_values($request->input('selected_fields', [])),
         ];
@@ -321,25 +321,25 @@ class ReportController extends Controller
     private function actualSchedules(): array
     {
         return [
-            ['name' => 'factory', 'report' => 'factory', 'rule' => 'Daily', 'forever' => 'Yes', 'start' => 'Nov 30, 2025 09:00', 'end' => 'no end date', 'active' => true],
-            ['name' => 'de_order_with_image', 'report' => 'de_order_with_image', 'rule' => 'Daily', 'forever' => 'Yes', 'start' => 'Dec 6, 2022 14:00', 'end' => 'no end date', 'active' => true],
-            ['name' => 'de_order_with_image', 'report' => 'de_order_with_image', 'rule' => 'Daily', 'forever' => 'Yes', 'start' => 'Dec 4, 2022 14:30', 'end' => 'no end date', 'active' => false],
+            ['name' => 'factory', 'report' => 'factory', 'rule' => '每日', 'forever' => '是', 'start' => '2025-11-30 09:00', 'end' => '无结束日期', 'active' => true],
+            ['name' => 'de_order_with_image', 'report' => 'de_order_with_image', 'rule' => '每日', 'forever' => '是', 'start' => '2022-12-06 14:00', 'end' => '无结束日期', 'active' => true],
+            ['name' => 'de_order_with_image', 'report' => 'de_order_with_image', 'rule' => '每日', 'forever' => '是', 'start' => '2022-12-04 14:30', 'end' => '无结束日期', 'active' => false],
         ];
     }
 
     private function reportHistory(): array
     {
         return [
-            ['name' => 'factory', 'type' => 'Scheduled', 'run' => 'May 30, 2026 09:05', 'start' => 'May 29, 2026 09:00', 'end' => 'May 30, 2026 09:00'],
-            ['name' => 'de_order_with_image', 'type' => 'Scheduled', 'run' => 'May 29, 2026 14:05', 'start' => 'May 28, 2026 14:00', 'end' => 'May 29, 2026 14:00'],
-            ['name' => 'factory', 'type' => 'Scheduled', 'run' => 'May 29, 2026 09:05', 'start' => 'May 28, 2026 09:00', 'end' => 'May 29, 2026 09:00'],
-            ['name' => 'de_order_with_image', 'type' => 'Scheduled', 'run' => 'May 28, 2026 14:05', 'start' => 'May 27, 2026 14:00', 'end' => 'May 28, 2026 14:00'],
-            ['name' => 'factory', 'type' => 'Scheduled', 'run' => 'May 28, 2026 09:05', 'start' => 'May 27, 2026 09:00', 'end' => 'May 28, 2026 09:00'],
-            ['name' => 'de_order_with_image', 'type' => 'Scheduled', 'run' => 'May 27, 2026 14:05', 'start' => 'May 26, 2026 14:00', 'end' => 'May 27, 2026 14:00'],
-            ['name' => 'de_order_with_image', 'type' => 'Immediate', 'run' => 'May 27, 2026 09:33', 'start' => 'May 22, 2026 09:00', 'end' => 'May 27, 2026 23:59'],
-            ['name' => 'factory', 'type' => 'Scheduled', 'run' => 'May 27, 2026 09:05', 'start' => 'May 26, 2026 09:00', 'end' => 'May 27, 2026 09:00'],
-            ['name' => 'de_order_with_image', 'type' => 'Scheduled', 'run' => 'May 26, 2026 14:05', 'start' => 'May 25, 2026 14:00', 'end' => 'May 26, 2026 14:00'],
-            ['name' => 'factory', 'type' => 'Scheduled', 'run' => 'May 26, 2026 09:05', 'start' => 'May 25, 2026 09:00', 'end' => 'May 26, 2026 09:00'],
+            ['name' => 'factory', 'type' => '定时', 'run' => '2026-05-30 09:05', 'start' => '2026-05-29 09:00', 'end' => '2026-05-30 09:00'],
+            ['name' => 'de_order_with_image', 'type' => '定时', 'run' => '2026-05-29 14:05', 'start' => '2026-05-28 14:00', 'end' => '2026-05-29 14:00'],
+            ['name' => 'factory', 'type' => '定时', 'run' => '2026-05-29 09:05', 'start' => '2026-05-28 09:00', 'end' => '2026-05-29 09:00'],
+            ['name' => 'de_order_with_image', 'type' => '定时', 'run' => '2026-05-28 14:05', 'start' => '2026-05-27 14:00', 'end' => '2026-05-28 14:00'],
+            ['name' => 'factory', 'type' => '定时', 'run' => '2026-05-28 09:05', 'start' => '2026-05-27 09:00', 'end' => '2026-05-28 09:00'],
+            ['name' => 'de_order_with_image', 'type' => '定时', 'run' => '2026-05-27 14:05', 'start' => '2026-05-26 14:00', 'end' => '2026-05-27 14:00'],
+            ['name' => 'de_order_with_image', 'type' => '立即', 'run' => '2026-05-27 09:33', 'start' => '2026-05-22 09:00', 'end' => '2026-05-27 23:59'],
+            ['name' => 'factory', 'type' => '定时', 'run' => '2026-05-27 09:05', 'start' => '2026-05-26 09:00', 'end' => '2026-05-27 09:00'],
+            ['name' => 'de_order_with_image', 'type' => '定时', 'run' => '2026-05-26 14:05', 'start' => '2026-05-25 14:00', 'end' => '2026-05-26 14:00'],
+            ['name' => 'factory', 'type' => '定时', 'run' => '2026-05-26 09:05', 'start' => '2026-05-25 09:00', 'end' => '2026-05-26 09:00'],
         ];
     }
 }

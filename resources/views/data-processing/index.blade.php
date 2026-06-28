@@ -1,8 +1,10 @@
 @extends('layouts.app')
 
+@section('title', '数据处理 - 千兴工作台')
+
 @section('content')
 <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Data Processing</h1>
+    <h1 class="text-3xl font-bold mb-6">数据处理</h1>
 
     @if ($errors->any())
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -26,9 +28,8 @@
         </div>
     @endif
 
-    <!-- Upload Form -->
     <div class="bg-white rounded shadow-md p-6 mb-8">
-        <h2 class="text-xl font-bold mb-4">Upload Order File</h2>
+        <h2 class="text-xl font-bold mb-4">上传订单文件</h2>
 
         <form method="POST" action="{{ route('data-processing.upload') }}" enctype="multipart/form-data" class="space-y-4"
               id="uploadForm" onsubmit="showProcessingState()">
@@ -36,44 +37,43 @@
 
             <div class="border-2 border-dashed border-gray-300 rounded p-6 text-center hover:border-blue-500 transition"
                  id="dropZone">
-                <p class="text-gray-600 mb-2" id="uploadPrompt">Drag and drop your file here, or click to select</p>
+                <p class="text-gray-600 mb-2" id="uploadPrompt">将文件拖放到此处，或点击选择文件</p>
                 <input type="file" name="file" id="fileInput" accept=".xlsx,.xls,.csv" required
                        class="hidden" onchange="updateFileName(this)">
                 <button type="button" id="chooseFileButton" onclick="document.getElementById('fileInput').click()"
                         class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    Choose File
+                    选择文件
                 </button>
                 <p id="fileName" class="text-gray-600 mt-2 text-sm selected-file-name"></p>
             </div>
 
             <div class="text-sm text-gray-600">
-                <p>Supported formats: Excel (.xlsx, .xls), CSV</p>
+                <p>支持格式：Excel（.xlsx、.xls）、CSV</p>
                 <p>上传表格文件名格式：order_日期时间范围.xlsx  （order后面要用_，范围连接用-，日期时间范围将作为第一列导表日期值显示  示例: order_060109-060209.xlsx）</p>
             </div>
 
             <button type="submit" id="processButton" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-6 rounded w-full">
-                <span id="processButtonText">Process File</span>
+                <span id="processButtonText">处理文件</span>
                 <span id="processingSpinner" class="processing-spinner hidden"></span>
             </button>
         </form>
     </div>
 
-    <!-- Processed Files List -->
     <div class="bg-white rounded shadow-md p-6">
-        <h2 class="text-xl font-bold mb-4">Processed Files</h2>
+        <h2 class="text-xl font-bold mb-4">处理文件列表</h2>
 
         @if($processedFiles->isEmpty())
-            <p class="text-gray-500">No processed files yet</p>
+            <p class="text-gray-500">暂无处理文件</p>
         @else
             <div class="overflow-x-auto">
                 <table class="w-full border-collapse">
                     <thead>
                         <tr class="bg-gray-100">
-                            <th class="border border-gray-300 px-4 py-2 text-left">File Name</th>
-                            <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
-                            <th class="border border-gray-300 px-4 py-2 text-left">Uploaded</th>
-                            <th class="border border-gray-300 px-4 py-2 text-left">Expires</th>
-                            <th class="border border-gray-300 px-4 py-2 text-center">Actions</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">文件名</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">状态</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">上传时间</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">过期时间</th>
+                            <th class="border border-gray-300 px-4 py-2 text-center">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -85,14 +85,14 @@
                                 </td>
                                 <td class="border border-gray-300 px-4 py-2 text-sm">
                                     @if($file->status === 'processing')
-                                        <span class="text-orange-600 font-bold">Processing</span>
+                                        <span class="text-orange-600 font-bold">处理中</span>
                                     @elseif($file->status === 'failed')
-                                        <span class="text-red-600 font-bold">Failed</span>
+                                        <span class="text-red-600 font-bold">失败</span>
                                         @if($file->error_message)
                                             <div class="text-xs text-red-600 mt-1">{{ $file->error_message }}</div>
                                         @endif
                                     @else
-                                        <span class="text-green-600 font-bold">Completed</span>
+                                        <span class="text-green-600 font-bold">已完成</span>
                                     @endif
                                 </td>
                                 <td class="border border-gray-300 px-4 py-2 text-sm">
@@ -100,13 +100,13 @@
                                 </td>
                                 <td class="border border-gray-300 px-4 py-2 text-sm">
                                     @if($file->expiry_info['is_expired'])
-                                        <span class="text-red-600 font-bold">Expired</span>
+                                        <span class="text-red-600 font-bold">已过期</span>
                                     @else
                                         <span class="text-gray-600">
                                             {{ $file->expires_at->format('Y-m-d H:i') }}
                                         </span>
                                         <div class="text-xs text-orange-600 mt-1">
-                                            Expires in {{ $file->expiry_info['expires_in_minutes'] }} minutes
+                                            {{ $file->expiry_info['expires_in_minutes'] }} 分钟后过期
                                         </div>
                                     @endif
                                 </td>
@@ -114,19 +114,21 @@
                                     @if($file->status === 'completed' && !$file->expiry_info['is_expired'])
                                         <a href="{{ route('data-processing.download', $file->id) }}"
                                            class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded text-sm inline-block mr-2">
-                                            Download All
+                                            下载全部
                                         </a>
                                     @elseif($file->status === 'processing')
-                                        <span class="text-sm text-gray-600 inline-block mr-2">Processing...</span>
+                                        <span class="text-sm text-gray-600 inline-block mr-2">处理中...</span>
                                     @endif
 
-                                    <form method="POST" action="{{ route('data-processing.delete', $file->id) }}"
-                                          class="inline" onsubmit="return confirm('Are you sure?')">
+                                    <form method="POST" action="{{ route('data-processing.delete', $file->id) }}" class="inline">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit"
-                                                class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">
-                                            Delete
+                                        <button type="button"
+                                                class="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm"
+                                                data-delete-trigger
+                                                data-delete-title="删除处理文件"
+                                                data-delete-message="删除后将无法恢复，确定要删除此处理文件吗？">
+                                            删除
                                         </button>
                                     </form>
                                 </td>
@@ -136,7 +138,6 @@
                 </table>
             </div>
 
-            <!-- Pagination -->
             <div class="mt-4">
                 {{ $processedFiles->links() }}
             </div>
@@ -158,12 +159,12 @@ function updateFileName(input) {
 
     if (input.files && input.files[0]) {
         fileName.innerHTML = '<span class="file-icon" aria-hidden="true"></span><span>' + escapeHtml(input.files[0].name) + '</span>';
-        chooseFileButton.textContent = 'Change File';
+        chooseFileButton.textContent = '更换文件';
         chooseFileButton.style.display = 'inline-block';
         uploadPrompt.style.display = 'none';
     } else {
         fileName.textContent = '';
-        chooseFileButton.textContent = 'Choose File';
+        chooseFileButton.textContent = '选择文件';
         chooseFileButton.style.display = 'inline-block';
         uploadPrompt.style.display = 'block';
     }
@@ -271,7 +272,7 @@ tr:hover {
     margin-left: 0.5rem;
     border: 2px solid rgba(255, 255, 255, 0.5);
     border-top-color: #ffffff;
-    border-radius: 9999px;
+    border-radius: 50%;
     vertical-align: middle;
     animation: processing-spin 0.8s linear infinite;
 }

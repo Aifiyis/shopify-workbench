@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Orders - Shopify Workbench</title>
+    <title>订单 - 千兴工作台</title>
     <style>
         * {
             margin: 0;
@@ -47,7 +47,7 @@
         .filter-section {
             background: white;
             padding: 20px;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 20px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
@@ -115,7 +115,7 @@
 
         .table-section {
             background: white;
-            border-radius: 10px;
+            border-radius: 8px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
@@ -207,9 +207,9 @@
 <body>
     <div class="navbar">
         <div>
-            <h1>📦 Orders - {{ $store->shop_name }}</h1>
+            <h1>订单 - {{ $store->shop_name }}</h1>
         </div>
-        <a href="{{ route('dashboard.index') }}">← Back to Dashboard</a>
+        <a href="{{ route('dashboard.index') }}">返回工作台</a>
     </div>
 
     <div class="container">
@@ -219,18 +219,18 @@
 
                 <div class="filter-row">
                     <div class="form-group">
-                        <label>Start Date</label>
+                        <label>开始日期</label>
                         <input type="date" name="start_date" value="{{ $startDate }}">
                     </div>
 
                     <div class="form-group">
-                        <label>End Date</label>
+                        <label>结束日期</label>
                         <input type="date" name="end_date" value="{{ $endDate }}">
                     </div>
 
-                    <button type="submit" class="btn btn-primary">Filter</button>
-                    <button type="button" class="btn btn-success" onclick="refreshOrders()">🔄 Refresh</button>
-                    <button type="button" class="btn btn-primary" onclick="exportOrders()">⬇️ Export Excel</button>
+                    <button type="submit" class="btn btn-primary">筛选</button>
+                    <button type="button" class="btn btn-success" onclick="refreshOrders()">刷新</button>
+                    <button type="button" class="btn btn-primary" onclick="exportOrders()">导出 Excel</button>
                 </div>
             </form>
         </div>
@@ -239,32 +239,32 @@
 
         <div class="loading" id="loading">
             <span class="spinner"></span>
-            <span>Processing...</span>
+            <span>处理中...</span>
         </div>
 
         <div class="table-section">
             @if ($orders->isEmpty())
                 <div class="no-data">
-                    <p>📭 No orders found. Try refreshing the data.</p>
+                    <p>暂无订单，请尝试刷新数据。</p>
                 </div>
             @else
                 <div class="table-container">
                     <table>
                         <thead>
                             <tr>
-                                <th>Order Date</th>
-                                <th>Order Name</th>
-                                <th>Product Title</th>
-                                <th>Product Type</th>
-                                <th>Multi-types</th>
-                                <th>Quantity</th>
+                                <th>订单日期</th>
+                                <th>订单名称</th>
+                                <th>产品标题</th>
+                                <th>产品类型</th>
+                                <th>多类型</th>
+                                <th>数量</th>
                                 <th>SKU</th>
-                                <th>Option 1</th>
-                                <th>Option 3</th>
-                                <th>Product Tags</th>
-                                <th>Pic Name</th>
-                                <th>Extra Details</th>
-                                <th>Custom Text</th>
+                                <th>选项 1</th>
+                                <th>选项 3</th>
+                                <th>产品标签</th>
+                                <th>图片名称</th>
+                                <th>附加详情</th>
+                                <th>自定义文本</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -325,17 +325,17 @@
             .then(data => {
                 showLoading(false);
                 if (data.success) {
-                    showMessage(`✓ ${data.message} (${data.count} orders)`, 'success');
+                    showMessage(`${data.message}（共 ${data.count} 个订单）`, 'success');
                     setTimeout(() => {
                         location.reload();
                     }, 1500);
                 } else {
-                    showMessage(`✗ ${data.message}`, 'error');
+                    showMessage(data.message, 'error');
                 }
             })
             .catch(error => {
                 showLoading(false);
-                showMessage(`✗ Error: ${error.message}`, 'error');
+                showMessage(`请求失败：${error.message}`, 'error');
             });
         }
 
@@ -362,15 +362,15 @@
             .then(data => {
                 showLoading(false);
                 if (data.success) {
-                    showMessage('✓ Export successful. Downloading...', 'success');
+                    showMessage('导出成功，正在下载...', 'success');
                     window.location.href = data.download_url;
                 } else {
-                    showMessage(`✗ ${data.message}`, 'error');
+                    showMessage(data.message, 'error');
                 }
             })
             .catch(error => {
                 showLoading(false);
-                showMessage(`✗ Error: ${error.message}`, 'error');
+                showMessage(`请求失败：${error.message}`, 'error');
             });
         }
     </script>

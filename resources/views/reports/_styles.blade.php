@@ -345,15 +345,6 @@
         padding: 28px 18px;
     }
 
-    .pill-help {
-        background: #ff881c;
-        border-radius: 18px;
-        color: #ffffff;
-        font-size: 13px;
-        font-weight: 700;
-        padding: 10px 14px;
-    }
-
     .schedule-form {
         padding: 24px 18px;
         max-width: 940px;

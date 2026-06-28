@@ -60,7 +60,7 @@ Route::middleware('auth:admin')->group(function () {
             ]);
 
             return redirect()->route('data-processing.index')
-                ->with('error', 'The upload URL was opened with GET. Please upload from the Data Processing page using Process File.');
+                ->with('error', '请在数据处理页面选择文件，并点击“处理文件”上传。');
         })->name('upload.redirect');
         Route::get('/{id}/download', [App\Http\Controllers\DataProcessingController::class, 'download'])->name('download');
         Route::delete('/{id}', [App\Http\Controllers\DataProcessingController::class, 'delete'])->name('delete');
