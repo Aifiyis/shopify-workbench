@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExportController;
+use App\Http\Controllers\ProductTypeController;
+use App\Http\Controllers\SkuMatchProductTypeController;
 
 Route::get('/', function () {
     return Auth::guard('admin')->check() ? redirect('/dashboard') : redirect('/login');
@@ -19,6 +21,11 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+
+    Route::resource('sku-product-types', SkuMatchProductTypeController::class)->except('show');
+    Route::post('product-types/quick-create', [ProductTypeController::class, 'quickStore'])
+        ->name('product-types.quick-store');
+    Route::resource('product-types', ProductTypeController::class)->except('show');
 
     Route::prefix('admins')->name('admins.')->group(function () {
         Route::get('/', [App\Http\Controllers\AdminManagementController::class, 'index'])->name('index');

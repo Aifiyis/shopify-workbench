@@ -19562,6 +19562,82 @@ function parseDataOption(option) {
 function isEnabled(value) {
   return value === '' || value === 'true' || value === '1';
 }
+function quickCreateMessage(data, field) {
+  if (data && data.errors && Array.isArray(data.errors[field]) && data.errors[field].length) {
+    return data.errors[field][0];
+  }
+  return data && data.message ? data.message : '创建失败，请稍后重试。';
+}
+function showQuickCreateFeedback(select, message, editUrl) {
+  var targetSelector = select.dataset.quickCreateErrorTarget;
+  if (!targetSelector) {
+    return;
+  }
+  var target = null;
+  try {
+    target = document.querySelector(targetSelector);
+  } catch (error) {
+    return;
+  }
+  if (!target) {
+    return;
+  }
+  target.replaceChildren();
+  if (message) {
+    target.appendChild(document.createTextNode(message));
+  }
+  if (editUrl) {
+    var link = document.createElement('a');
+    link.href = editUrl;
+    link.textContent = select.dataset.quickCreateEditLabel || '编辑已有记录';
+    link.className = 'ml-2';
+    target.appendChild(link);
+  }
+}
+function createRemoteOption(select, input, callback) {
+  var url = select.dataset.quickCreateUrl;
+  var field = select.dataset.quickCreateField || 'name';
+  var valueKey = select.dataset.quickCreateValueKey || 'id';
+  var labelKey = select.dataset.quickCreateLabelKey || field;
+  var csrf = document.querySelector('meta[name="csrf-token"]');
+  var payload = {};
+  payload[field] = input.trim();
+  showQuickCreateFeedback(select, '', null);
+  fetch(url, {
+    method: select.dataset.quickCreateMethod || 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrf ? csrf.content : ''
+    },
+    body: JSON.stringify(payload)
+  }).then(function (response) {
+    return response.json()["catch"](function () {
+      return {};
+    }).then(function (data) {
+      return {
+        ok: response.ok,
+        data: data
+      };
+    });
+  }).then(function (result) {
+    if (!result.ok) {
+      showQuickCreateFeedback(select, quickCreateMessage(result.data, field), result.data.edit_url || null);
+      callback();
+      return;
+    }
+    var option = Object.assign({}, result.data, {
+      value: String(result.data[valueKey]),
+      text: result.data[labelKey]
+    });
+    showQuickCreateFeedback(select, '', null);
+    callback(option);
+  })["catch"](function () {
+    showQuickCreateFeedback(select, '创建失败，请稍后重试。', null);
+    callback();
+  });
+}
 function initializeSelect(select) {
   if (select.dataset.adminUiInitialized === 'true' || typeof window.TomSelect === 'undefined') {
     return;
@@ -19582,6 +19658,15 @@ function initializeSelect(select) {
     placeholder: select.dataset.placeholder || undefined,
     allowEmptyOption: true
   };
+  if (select.dataset.quickCreateUrl) {
+    settings.create = function (input, callback) {
+      createRemoteOption(select, input, callback);
+    };
+    settings.createFilter = function (input) {
+      return input.trim().length > 0;
+    };
+    settings.persist = false;
+  }
   if (hasCraftOptions || select.dataset.optionType === 'craft') {
     settings.searchField = ['text', 'path'];
     settings.render = {
