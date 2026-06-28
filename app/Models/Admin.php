@@ -53,6 +53,11 @@ class Admin extends Authenticatable
         return $this->hasOne(Employee::class, 'admin_id');
     }
 
+    public function isActiveAccount()
+    {
+        return $this->is_active && !$this->trashed();
+    }
+
     public function stores()
     {
         return $this->belongsToMany(
