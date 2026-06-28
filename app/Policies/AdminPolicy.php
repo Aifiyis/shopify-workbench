@@ -29,9 +29,11 @@ class AdminPolicy
         return $this->permissions->canManageAccount($actor, null, $targetRole);
     }
 
-    public function update(Admin $actor, Admin $target): bool
+    public function update(Admin $actor, Admin $target, ?string $proposedRole = null): bool
     {
-        return $this->permissions->canManageAccount($actor, $target);
+        $targetRole = $proposedRole === null ? $target->role : $proposedRole;
+
+        return $this->permissions->canManageAccount($actor, $target, $targetRole);
     }
 
     public function delete(Admin $actor, Admin $target): bool

@@ -89,8 +89,10 @@ class PermissionService
             return true;
         }
 
-        $role = $target ? $target->role : $targetRole;
+        $currentRole = $target ? $target->role : $targetRole;
 
-        return $role === 'employee' && $this->has($actor, 'admin_accounts.manage');
+        return $currentRole === 'employee'
+            && $targetRole === 'employee'
+            && $this->has($actor, 'admin_accounts.manage');
     }
 }

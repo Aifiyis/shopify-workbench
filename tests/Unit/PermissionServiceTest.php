@@ -164,7 +164,17 @@ class PermissionServiceTest extends TestCase
         $this->assertTrue($this->permissionService->canManageAccount(
             $actor,
             $employeeTarget,
+            'employee'
+        ));
+        $this->assertFalse($this->permissionService->canManageAccount(
+            $actor,
+            $employeeTarget,
             'manager'
+        ));
+        $this->assertFalse($this->permissionService->canManageAccount(
+            $actor,
+            $employeeTarget,
+            'super'
         ));
         $this->assertFalse($this->permissionService->canManageAccount(
             $actor,

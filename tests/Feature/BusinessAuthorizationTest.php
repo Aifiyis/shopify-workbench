@@ -175,6 +175,38 @@ class BusinessAuthorizationTest extends TestCase
         $this->assertFalse(Gate::forUser($positionActor)->allows('update', $managerTarget));
     }
 
+    public function test_admin_update_authorization_checks_current_and_proposed_roles()
+    {
+        $manager = $this->createAdmin('manager');
+        $employeeTarget = $this->createAdmin('employee');
+
+        $this->assertTrue(Gate::forUser($manager)->allows(
+            'update',
+            [$employeeTarget, 'employee']
+        ));
+        $this->assertFalse(Gate::forUser($manager)->allows(
+            'update',
+            [$employeeTarget, 'manager']
+        ));
+        $this->assertFalse(Gate::forUser($manager)->allows(
+            'update',
+            [$employeeTarget, 'super']
+        ));
+
+        $activeSuper = $this->createAdmin('super');
+        $managerTarget = $this->createAdmin('manager');
+        $superTarget = $this->createAdmin('super');
+
+        $this->assertTrue(Gate::forUser($activeSuper)->allows(
+            'update',
+            [$managerTarget, 'super']
+        ));
+        $this->assertTrue(Gate::forUser($activeSuper)->allows(
+            'update',
+            [$superTarget, 'manager']
+        ));
+    }
+
     public function test_only_active_non_deleted_super_can_manage_manager_and_super_accounts()
     {
         $activeSuper = $this->createAdmin('super');
