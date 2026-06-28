@@ -8,6 +8,8 @@
 
 **Tech Stack:** Laravel 8, PHP 7.3-compatible syntax, Blade, Eloquent, SQLite/MySQL-compatible migrations, Tailwind CDN, Tom Select 2.4.3, vanilla JavaScript, PHPUnit 9, Playwright.
 
+**Execution Override (2026-06-28):** For all remaining tasks, the user waived mandatory pre-implementation RED runs to reduce token and subagent usage. Focused tests must still be written and pass before every commit. Do not run the full suite or use the local database for tests.
+
 ---
 
 ## File Structure
@@ -479,13 +481,13 @@ git commit -m "feat: authorize business actions by role and position"
 
 Authenticate an admin, request `/dashboard`, and assert the response contains `千兴工作台`, `工作台`, `数据处理`, `SKU 产品类型`, `订单处理配置`, `工艺层级管理`, and `退出登录`, with `<html lang="zh-CN">`.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\ChineseAdminLayoutTest.php
 ```
 
-Expected: FAIL because the layout is English.
+Record the current result. A pre-implementation failure is not required; the same command must pass before commit.
 
 - [ ] **Step 3: Add Chinese locale files and set the locale**
 
@@ -556,13 +558,13 @@ Cover:
 - duplicate names return 422 with a Chinese edit-route message;
 - product types with SKU or processing references cannot be deleted.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\SkuProductTypeCrudTest.php
 ```
 
-Expected: FAIL because routes/controllers do not exist.
+Record the current result. A pre-implementation failure is not required; the same command must pass before commit.
 
 - [ ] **Step 3: Add resource routes and JSON endpoint**
 
@@ -611,11 +613,11 @@ git commit -m "feat: add SKU and product type management"
 - Modify: `routes/web.php`
 - Test: `tests/Feature/OrderProcessingCrudTest.php`
 
-- [ ] **Step 1: Write failing tests**
+- [ ] **Step 1: Add focused tests**
 
-Cover search/pagination, single product-type configuration, position-filtered staff, settlement values, authorized CRUD, soft delete, and preservation of legacy text when employee IDs are null.
+Cover search/pagination, single product-type configuration, position-filtered multi-employee assignments, settlement values, authorized CRUD, soft delete, and preservation of all legacy processor text and single-ID fields.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\OrderProcessingCrudTest.php
@@ -627,11 +629,11 @@ php artisan test tests\Feature\OrderProcessingCrudTest.php
 Route::resource('order-processing', OrderProcessingController::class)->except('show');
 ```
 
-Requests require an active product type, optional active craft, and optional active employees with exact position codes. Enforce one active configuration per product type. Save selected employee names to legacy snapshot columns and settlement separately.
+Requests require an active product type, optional active craft, and optional arrays of active employees with exact position codes. Enforce one active configuration per product type. Sync the typed assignment pivot for order, artwork, and procurement employees. Do not overwrite legacy processor text or single-ID compatibility columns. Save settlement separately.
 
 - [ ] **Step 4: Build compact list and form views**
 
-List columns: product type, craft path, three processors, settlement, template, actions. Form product type is searchable but not creatable. Craft uses hierarchical rendering. Processor selects are searchable single-selects. Settlement uses creatable Tom Select with `月结` and `周结` defaults.
+List columns: product type, craft path, three processor groups, settlement, template, actions. Form product type is searchable but not creatable. Craft uses hierarchical rendering. Processor controls are searchable multi-selects and list every assigned employee with `、`. Settlement uses creatable Tom Select with `月结` and `周结` defaults.
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -656,7 +658,7 @@ git commit -m "feat: add order processing configuration management"
 
 Cover unlimited parent depth, path generation, search by name/path, cycle prevention, JSON quick-create response `{id, name, path, depth}`, soft delete, blocked deletion with children, and blocked deletion when referenced by order processing.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\ProcessingCraftCrudTest.php
@@ -715,7 +717,7 @@ git commit -m "feat: add craft hierarchy management"
 
 Cover employee name/company/supervisor/account/positions, multi-position sync, company-name autocomplete values, soft delete exclusion from business dropdowns, position CRUD, manager access, and delegation rejection for unowned/non-delegable permissions.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\EmployeePositionCrudTest.php
@@ -751,7 +753,7 @@ git commit -m "feat: add employee and position permission management"
 
 Assert: super manages manager/employee; manager manages employee accounts; employee with `admin_accounts.manage` manages employee accounts; no non-super manages manager/super; delete soft-deletes and blocks login; account forms link an optional employee profile.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\AdminAccountManagementTest.php
@@ -789,7 +791,7 @@ git commit -m "feat: separate administrator account permissions"
 
 Request each reachable page and assert Chinese title, field labels, buttons, status text, empty-state text, and navigation. Assert obsolete English UI strings such as `Dashboard`, `Logout`, `Delete`, `Download All`, and `Admin Management` are absent from rendered pages.
 
-- [ ] **Step 2: Run and verify RED**
+- [ ] **Step 2: Run the focused baseline test when useful**
 
 ```powershell
 php artisan test tests\Feature\ExistingPagesChineseLocalizationTest.php
