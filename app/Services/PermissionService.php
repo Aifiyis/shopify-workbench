@@ -49,7 +49,6 @@ class PermissionService
 
         $query = Permission::query()
             ->where('is_delegable', true)
-            ->where('code', '!=', 'permissions.assign')
             ->orderBy('code');
 
         if ($admin->role === 'super') {

@@ -82,7 +82,7 @@ class PermissionServiceTest extends TestCase
         $this->assertFalse($this->permissionService->has($admin, 'sku_product_types.manage'));
     }
 
-    public function test_delegable_for_returns_only_possessed_delegable_permissions_in_code_order()
+    public function test_delegable_for_uses_possession_and_delegable_flag_in_code_order()
     {
         $advertiser = $this->createAdmin('employee');
         $position = Position::where('code', 'advertising')->firstOrFail();
@@ -105,7 +105,7 @@ class PermissionServiceTest extends TestCase
         $position->permissions()->attach($assign->id);
 
         $this->assertSame(
-            ['sku_product_types.manage'],
+            ['permissions.assign', 'sku_product_types.manage'],
             $this->permissionService->delegableFor($advertiser)->pluck('code')->all()
         );
 
@@ -114,6 +114,7 @@ class PermissionServiceTest extends TestCase
             'admin_accounts.manage',
             'employees.manage',
             'order_processing.manage',
+            'permissions.assign',
             'positions.manage',
             'processing_crafts.manage',
             'sku_product_types.manage',
@@ -124,6 +125,7 @@ class PermissionServiceTest extends TestCase
             'admin_accounts.manage',
             'employees.manage',
             'order_processing.manage',
+            'permissions.assign',
             'positions.manage',
             'processing_crafts.manage',
             'reports.manage',
