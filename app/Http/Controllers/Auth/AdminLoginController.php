@@ -3,33 +3,29 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Admin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 
 class AdminLoginController extends Controller
 {
-    /**
-     * 显示登录页面
-     */
     public function showLoginForm()
     {
         return view('auth.login');
     }
 
-    /**
-     * 处理登录请求
-     */
     public function login(Request $request)
     {
         $credentials = $request->validate([
-            'email' => 'required|email',
-            'password' => 'required|min:6',
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string', 'min:6'],
+        ], [], [
+            'email' => '邮箱',
+            'password' => '密码',
         ]);
+        $credentials['is_active'] = true;
 
-        // 尝试使用 admins 表认证
         if (Auth::guard('admin')->attempt($credentials, $request->filled('remember'))) {
+            $request->session()->regenerate();
             $admin = Auth::guard('admin')->user();
             $admin->update(['last_login' => now()]);
 
@@ -37,13 +33,10 @@ class AdminLoginController extends Controller
         }
 
         return back()->withErrors([
-            'email' => 'The provided credentials do not match our records.',
+            'email' => '邮箱或密码错误，或者账号已停用。',
         ])->onlyInput('email');
     }
 
-    /**
-     * 处理登出请求
-     */
     public function logout(Request $request)
     {
         Auth::guard('admin')->logout();

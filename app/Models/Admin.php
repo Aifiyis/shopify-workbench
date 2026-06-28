@@ -35,7 +35,7 @@ class Admin extends Authenticatable
 
     public function parent()
     {
-        return $this->belongsTo(Admin::class, 'parent_admin_id');
+        return $this->belongsTo(Admin::class, 'parent_admin_id')->withTrashed();
     }
 
     public function subordinates()
