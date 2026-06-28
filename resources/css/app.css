@@ -412,6 +412,10 @@ a {
     .admin-content h1 {
         font-size: 21px;
     }
+
+    .admin-content .overflow-x-auto > table {
+        min-width: 720px;
+    }
 }
 
 @media (max-width: 480px) {

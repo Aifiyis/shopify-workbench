@@ -4,6 +4,7 @@
 /public/storage
 /storage/*.key
 /storage/app/private/sku-options-image/
+/tests/browser-results/
 /storage/app/private/*.before-*.json
 /storage/app/private/*progress*.json
 /storage/app/private/*report*.json
