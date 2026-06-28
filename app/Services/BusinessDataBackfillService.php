@@ -232,6 +232,22 @@ class BusinessDataBackfillService
                 }
 
                 $processingCraft->save();
+
+                $this->addProcessingCraftAssignment(
+                    $processingCraft,
+                    $orderEmployee,
+                    'order_processing'
+                );
+                $this->addProcessingCraftAssignment(
+                    $processingCraft,
+                    $artworkEmployee,
+                    'artwork_processing'
+                );
+                $this->addProcessingCraftAssignment(
+                    $processingCraft,
+                    $procurementEmployee,
+                    'procurement'
+                );
             }
         });
 
@@ -263,6 +279,26 @@ class BusinessDataBackfillService
         $employee->positions()->syncWithoutDetaching([$position->id]);
 
         return $employee;
+    }
+
+    private function addProcessingCraftAssignment(
+        ProductProcessingCraft $processingCraft,
+        ?Employee $employee,
+        string $assignmentType
+    ): void {
+        if ($employee === null) {
+            return;
+        }
+
+        $timestamp = now();
+
+        DB::table('product_processing_craft_employee_assignment')->insertOrIgnore([
+            'product_processing_craft_id' => $processingCraft->id,
+            'employee_id' => $employee->id,
+            'assignment_type' => $assignmentType,
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ]);
     }
 
     private function countEmployeeLinks(): int

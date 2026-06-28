@@ -202,6 +202,60 @@ class BusinessDataBackfillServiceTest extends TestCase
         $this->assertSame($before->updated_at, $after->updated_at);
     }
 
+    public function test_processing_names_add_typed_assignments_and_preserve_timestamps_on_rerun()
+    {
+        $processing = ProductProcessingCraft::create([
+            'chinese_name' => 'Typed assignment product',
+            'order_processor' => 'Order employee',
+            'artwork_processor' => 'Artwork employee',
+            'procurement_processor' => 'Procurement employee',
+        ]);
+        $service = app(BusinessDataBackfillService::class);
+
+        $service->run();
+
+        $processing->refresh();
+        $expectedAssignments = [
+            'order_processing' => $processing->order_processor_employee_id,
+            'artwork_processing' => $processing->artwork_processor_employee_id,
+            'procurement' => $processing->procurement_processor_employee_id,
+        ];
+
+        foreach ($expectedAssignments as $assignmentType => $employeeId) {
+            $this->assertDatabaseHas('product_processing_craft_employee_assignment', [
+                'product_processing_craft_id' => $processing->id,
+                'employee_id' => $employeeId,
+                'assignment_type' => $assignmentType,
+            ]);
+        }
+
+        $this->assertSame(3, DB::table(
+            'product_processing_craft_employee_assignment'
+        )->where('product_processing_craft_id', $processing->id)->count());
+
+        DB::table('product_processing_craft_employee_assignment')
+            ->where('product_processing_craft_id', $processing->id)
+            ->update([
+                'created_at' => '2020-01-02 03:04:05',
+                'updated_at' => '2020-01-02 03:04:05',
+            ]);
+        $before = DB::table('product_processing_craft_employee_assignment')
+            ->where('product_processing_craft_id', $processing->id)
+            ->orderBy('assignment_type')
+            ->get();
+
+        $service->run();
+
+        $after = DB::table('product_processing_craft_employee_assignment')
+            ->where('product_processing_craft_id', $processing->id)
+            ->orderBy('assignment_type')
+            ->get();
+
+        $this->assertCount(3, $after);
+        $this->assertSame($before->pluck('created_at')->all(), $after->pluck('created_at')->all());
+        $this->assertSame($before->pluck('updated_at')->all(), $after->pluck('updated_at')->all());
+    }
+
     private function assertPositionPermissions($positionCode, array $permissionCodes)
     {
         $actual = Position::where('code', $positionCode)

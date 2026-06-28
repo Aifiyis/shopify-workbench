@@ -69,4 +69,40 @@ class ProductProcessingCraft extends Model
     {
         return $this->belongsTo(Employee::class, 'procurement_processor_employee_id');
     }
+
+    public function orderProcessorEmployees()
+    {
+        return $this->belongsToMany(
+            Employee::class,
+            'product_processing_craft_employee_assignment'
+        )
+            ->withPivot('assignment_type')
+            ->wherePivot('assignment_type', 'order_processing')
+            ->withTimestamps()
+            ->withTrashed();
+    }
+
+    public function artworkProcessorEmployees()
+    {
+        return $this->belongsToMany(
+            Employee::class,
+            'product_processing_craft_employee_assignment'
+        )
+            ->withPivot('assignment_type')
+            ->wherePivot('assignment_type', 'artwork_processing')
+            ->withTimestamps()
+            ->withTrashed();
+    }
+
+    public function procurementProcessorEmployees()
+    {
+        return $this->belongsToMany(
+            Employee::class,
+            'product_processing_craft_employee_assignment'
+        )
+            ->withPivot('assignment_type')
+            ->wherePivot('assignment_type', 'procurement')
+            ->withTimestamps()
+            ->withTrashed();
+    }
 }

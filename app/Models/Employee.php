@@ -40,4 +40,17 @@ class Employee extends Model
     {
         return $this->belongsToMany(Position::class)->withTimestamps();
     }
+
+    public function processingCraftAssignments()
+    {
+        return $this->belongsToMany(
+            ProductProcessingCraft::class,
+            'product_processing_craft_employee_assignment',
+            'employee_id',
+            'product_processing_craft_id'
+        )
+            ->withPivot('assignment_type')
+            ->withTimestamps()
+            ->withTrashed();
+    }
 }
