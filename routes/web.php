@@ -4,8 +4,10 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\OrderProcessingController;
+use App\Http\Controllers\PositionController;
 use App\Http\Controllers\ProcessingCraftController;
 use App\Http\Controllers\ProductTypeController;
 use App\Http\Controllers\SkuMatchProductTypeController;
@@ -23,6 +25,9 @@ Route::middleware('auth:admin')->group(function () {
     Route::post('/logout', [AdminLoginController::class, 'logout'])->name('logout');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard.index');
+
+    Route::resource('employees', EmployeeController::class)->except('show');
+    Route::resource('positions', PositionController::class)->except('show');
 
     Route::resource('sku-product-types', SkuMatchProductTypeController::class)->except('show');
     Route::post('product-types/quick-create', [ProductTypeController::class, 'quickStore'])

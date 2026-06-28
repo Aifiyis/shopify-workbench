@@ -116,7 +116,20 @@ class BusinessAuthorizationTest extends TestCase
     public function test_seeded_manager_permissions_authorize_staff_positions_and_delegation()
     {
         $manager = $this->createAdmin('manager');
-        $employee = Employee::create(['name' => 'Employee', 'is_active' => true]);
+        $managerEmployee = Employee::create([
+            'name' => 'Manager employee',
+            'admin_id' => $manager->id,
+            'is_active' => true,
+        ]);
+        $employee = Employee::create([
+            'name' => 'Direct employee',
+            'supervisor_id' => $managerEmployee->id,
+            'is_active' => true,
+        ]);
+        $unrelatedEmployee = Employee::create([
+            'name' => 'Unrelated employee',
+            'is_active' => true,
+        ]);
         $position = Position::where('code', 'advertising')->firstOrFail();
 
         foreach (['viewAny', 'create'] as $ability) {
@@ -125,6 +138,7 @@ class BusinessAuthorizationTest extends TestCase
         }
         foreach (['view', 'update', 'delete'] as $ability) {
             $this->assertTrue(Gate::forUser($manager)->allows($ability, $employee));
+            $this->assertFalse(Gate::forUser($manager)->allows($ability, $unrelatedEmployee));
             $this->assertTrue(Gate::forUser($manager)->allows($ability, $position));
         }
         $this->assertTrue(Gate::forUser($manager)->allows('assignPermissions', $position));
