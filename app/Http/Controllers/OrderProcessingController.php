@@ -217,10 +217,7 @@ class OrderProcessingController extends Controller
             return $employees;
         }
 
-        $historical = $configuration->{$relation}
-            ->filter(function ($employee) {
-                return !$employee->is_active || $employee->trashed();
-            });
+        $historical = $configuration->{$relation};
 
         return $employees
             ->concat($historical)

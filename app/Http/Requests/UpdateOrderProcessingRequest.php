@@ -86,11 +86,6 @@ class UpdateOrderProcessingRequest extends StoreOrderProcessingRequest
                 ->where('assignments.product_processing_craft_id', $configuration->id)
                 ->where('assignments.assignment_type', $assignmentType)
                 ->where('assignments.employee_id', $value)
-                ->where(function ($query) {
-                    $query
-                        ->where('employees.is_active', false)
-                        ->orWhereNotNull('employees.deleted_at');
-                })
                 ->exists();
 
             if (!$historicalAssignment) {

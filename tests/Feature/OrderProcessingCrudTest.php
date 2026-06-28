@@ -323,6 +323,7 @@ class OrderProcessingCrudTest extends TestCase
         $typeB = ProductType::create(['chinese_name' => '历史配置乙']);
         $inactive = $this->createEmployee('历史停用员工', 'order_processing', false);
         $deleted = $this->createEmployee('历史删除员工', 'artwork_processing');
+        $positionChanged = $this->createEmployee('历史职位变更员工', 'order_processing');
         $configA = ProductProcessingCraft::create([
             'product_type_id' => $typeA->id,
             'chinese_name' => $typeA->chinese_name,
@@ -331,17 +332,23 @@ class OrderProcessingCrudTest extends TestCase
             'product_type_id' => $typeB->id,
             'chinese_name' => $typeB->chinese_name,
         ]);
-        $this->sync($configA, 'orderProcessorEmployees', 'order_processing', [$inactive]);
+        $this->sync($configA, 'orderProcessorEmployees', 'order_processing', [
+            $inactive,
+            $positionChanged,
+        ]);
         $this->sync($configA, 'artworkProcessorEmployees', 'artwork_processing', [$deleted]);
         $deleted->delete();
+        $positionChanged->positions()->detach();
 
         $this->actingAs($actor, 'admin')
             ->get(route('order-processing.edit', $configA))
             ->assertOk()
             ->assertSee('历史停用员工（已停用）')
             ->assertSee('历史删除员工（已删除）')
-            ->assertViewHas('orderEmployees', function ($employees) use ($inactive) {
-                return $employees->contains('id', $inactive->id);
+            ->assertSee('历史职位变更员工')
+            ->assertViewHas('orderEmployees', function ($employees) use ($inactive, $positionChanged) {
+                return $employees->contains('id', $inactive->id)
+                    && $employees->contains('id', $positionChanged->id);
             })
             ->assertViewHas('artworkEmployees', function ($employees) use ($inactive, $deleted) {
                 return !$employees->contains('id', $inactive->id)
@@ -351,7 +358,7 @@ class OrderProcessingCrudTest extends TestCase
         $this->actingAs($actor, 'admin')
             ->put(route('order-processing.update', $configA), [
                 'product_type_id' => $typeA->id,
-                'order_processor_employee_ids' => [$inactive->id],
+                'order_processor_employee_ids' => [$inactive->id, $positionChanged->id],
                 'artwork_processor_employee_ids' => [$deleted->id],
             ])
             ->assertRedirect(route('order-processing.index'));
@@ -366,6 +373,12 @@ class OrderProcessingCrudTest extends TestCase
             ->put(route('order-processing.update', $configB), [
                 'product_type_id' => $typeB->id,
                 'order_processor_employee_ids' => [$inactive->id],
+            ])
+            ->assertSessionHasErrors('order_processor_employee_ids.0');
+        $this->actingAs($actor, 'admin')
+            ->put(route('order-processing.update', $configB), [
+                'product_type_id' => $typeB->id,
+                'order_processor_employee_ids' => [$positionChanged->id],
             ])
             ->assertSessionHasErrors('order_processor_employee_ids.0');
         $this->actingAs($actor, 'admin')
