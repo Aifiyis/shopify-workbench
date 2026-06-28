@@ -78,6 +78,12 @@
                         </option>
                     @endforeach
                 </select>
+                <div class="mt-2 flex flex-wrap gap-3 text-sm">
+                    @can('create', \App\Models\ProcessingCraftNode::class)
+                        <button type="button" class="border-0 bg-transparent p-0 text-green-700 underline" data-craft-create-open>新建工艺</button>
+                    @endcan
+                    <a href="{{ route('processing-crafts.index', ['return_to' => request()->getRequestUri()]) }}">管理工艺</a>
+                </div>
             </div>
         </div>
 
@@ -140,4 +146,90 @@
             <a class="button button-secondary no-underline" href="{{ route('order-processing.index') }}">取消</a>
         </div>
     </form>
+
+    @can('create', \App\Models\ProcessingCraftNode::class)
+        <dialog id="quick-craft-dialog" class="confirm-delete-dialog" aria-labelledby="quick-craft-title">
+            <form id="quick-craft-form" class="confirm-delete-content space-y-4" data-store-url="{{ route('processing-crafts.quick-store') }}">
+                <h2 id="quick-craft-title" class="m-0">新建工艺</h2>
+                <div>
+                    <label for="quick_craft_name" class="mb-1 block font-semibold">工艺名称</label>
+                    <input id="quick_craft_name" name="name" required maxlength="255">
+                </div>
+                <div>
+                    <label for="quick_craft_parent_id" class="mb-1 block font-semibold">上级工艺</label>
+                    <select id="quick_craft_parent_id" name="parent_id" data-searchable-select data-option-type="craft" data-placeholder="无上级工艺">
+                        <option value="">无上级工艺</option>
+                        @foreach ($crafts as $craft)
+                            <option value="{{ $craft->id }}" data-depth="{{ substr_count($craft->path, '-') }}" data-path="{{ $craft->path }}">{{ $craft->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div id="quick-craft-error" class="text-sm text-red-700" role="alert" aria-live="polite"></div>
+                <div class="confirm-delete-actions">
+                    <button type="button" class="button button-secondary" data-craft-create-cancel>取消</button>
+                    <button type="submit" class="button bg-green-700 text-white hover:bg-green-800">创建工艺</button>
+                </div>
+            </form>
+        </dialog>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var dialog = document.getElementById('quick-craft-dialog');
+                var form = document.getElementById('quick-craft-form');
+                var error = document.getElementById('quick-craft-error');
+                var submit = form.querySelector('[type="submit"]');
+
+                document.querySelector('[data-craft-create-open]').addEventListener('click', function () {
+                    error.textContent = '';
+                    dialog.showModal();
+                });
+                document.querySelector('[data-craft-create-cancel]').addEventListener('click', function () {
+                    dialog.close();
+                });
+                form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    error.textContent = '';
+                    submit.disabled = true;
+
+                    fetch(form.dataset.storeUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+                        },
+                        body: JSON.stringify({
+                            name: form.elements.name.value,
+                            parent_id: form.elements.parent_id.value || null
+                        })
+                    }).then(function (response) {
+                        return response.json().then(function (data) {
+                            return { ok: response.ok, data: data };
+                        });
+                    }).then(function (result) {
+                        if (!result.ok) {
+                            var errors = result.data.errors || {};
+                            error.textContent = Object.keys(errors).reduce(function (messages, field) {
+                                return messages.concat(errors[field]);
+                            }, []).join(' ') || result.data.message || '创建失败，请稍后重试。';
+                            return;
+                        }
+
+                        window.AdminUI.addSelectOption('#craft_id', result.data, true);
+                        window.AdminUI.addSelectOption('#quick_craft_parent_id', result.data, false);
+                        form.reset();
+                        var parentSelect = document.getElementById('quick_craft_parent_id').tomselect;
+                        if (parentSelect) {
+                            parentSelect.clear(true);
+                        }
+                        dialog.close();
+                    }).catch(function () {
+                        error.textContent = '创建失败，请稍后重试。';
+                    }).finally(function () {
+                        submit.disabled = false;
+                    });
+                });
+            });
+        </script>
+    @endcan
 @endsection

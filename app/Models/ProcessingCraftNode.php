@@ -11,7 +11,7 @@ class ProcessingCraftNode extends Model
 
     public const FIELD_LABELS = [
         'parent_id' => '上级工艺',
-        'name' => '工艺节点名称',
+        'name' => '工艺名称',
         'path' => '完整工艺路径',
     ];
 

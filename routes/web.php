@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\OrderProcessingController;
+use App\Http\Controllers\ProcessingCraftController;
 use App\Http\Controllers\ProductTypeController;
 use App\Http\Controllers\SkuMatchProductTypeController;
 
@@ -28,6 +29,9 @@ Route::middleware('auth:admin')->group(function () {
         ->name('product-types.quick-store');
     Route::resource('product-types', ProductTypeController::class)->except('show');
     Route::resource('order-processing', OrderProcessingController::class)->except('show');
+    Route::post('processing-crafts/quick-create', [ProcessingCraftController::class, 'quickStore'])
+        ->name('processing-crafts.quick-store');
+    Route::resource('processing-crafts', ProcessingCraftController::class)->except('show');
 
     Route::prefix('admins')->name('admins.')->group(function () {
         Route::get('/', [App\Http\Controllers\AdminManagementController::class, 'index'])->name('index');
