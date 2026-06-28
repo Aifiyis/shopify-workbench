@@ -390,6 +390,7 @@ a {
     }
 
     .admin-nav {
+        width: -moz-max-content;
         width: max-content;
         flex-direction: row;
     }

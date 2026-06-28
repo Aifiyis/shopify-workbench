@@ -1,102 +1,105 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Shopify Workbench')</title>
+    <title>千兴工作台</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css">
+    @if (file_exists(public_path('mix-manifest.json')) && file_exists(public_path('css/app.css')))
+        <link rel="stylesheet" href="{{ mix('/css/app.css') }}">
+    @endif
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background: #f5f5f5;
-        }
-
-        .navbar {
-            background: white;
-            padding: 15px 30px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .navbar h1 {
-            font-size: 20px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .navbar a {
-            text-decoration: none;
-            color: #333;
-            margin: 0 15px;
-        }
-
-        .navbar a:hover {
-            color: #0066cc;
-        }
-
-        .sidebar {
-            background: white;
-            padding: 20px;
-            margin-top: 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .sidebar a {
-            display: block;
-            padding: 10px 15px;
-            margin: 5px 0;
-            border-radius: 5px;
-            text-decoration: none;
-            color: #333;
-        }
-
-        .sidebar a:hover {
-            background: #f0f0f0;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js" defer></script>
+    @if (file_exists(public_path('mix-manifest.json')) && file_exists(public_path('js/app.js')))
+        <script src="{{ mix('/js/app.js') }}" defer></script>
+    @endif
 </head>
 <body>
-    <div class="navbar">
-        <h1><a href="{{ route('dashboard.index') }}" style="color: inherit; text-decoration: none;">Shopify Workbench</a></h1>
-        <div>
-            @auth('admin')
-                <span style="margin-right: 15px;">{{ Auth::guard('admin')->user()->name }}</span>
-                <form method="POST" action="{{ route('logout') }}" style="display: inline;">
-                    @csrf
-                    <button type="submit" style="background: none; border: none; color: #0066cc; cursor: pointer; text-decoration: underline;">Logout</button>
-                </form>
-            @endauth
-        </div>
-    </div>
+    @auth('admin')
+        @php
+            $admin = Auth::guard('admin')->user();
+            $navItems = [
+                ['label' => '工作台', 'route' => 'dashboard.index', 'patterns' => ['dashboard.*']],
+                ['label' => '数据处理', 'route' => 'data-processing.index', 'patterns' => ['data-processing.*']],
+                ['label' => 'SKU 产品类型', 'route' => 'sku-product-types.index', 'patterns' => ['sku-product-types.*', 'product-types.*']],
+                ['label' => '订单处理配置', 'route' => 'order-processing.index', 'patterns' => ['order-processing.*']],
+                ['label' => '工艺层级管理', 'route' => 'processing-crafts.index', 'patterns' => ['processing-crafts.*']],
+            ];
+        @endphp
 
-    <div style="display: flex;">
-        <div style="width: 200px;">
-            <div class="sidebar">
-                <a href="{{ route('dashboard.index') }}">Dashboard</a>
-                @auth('admin')
-                    @if(Auth::guard('admin')->user()->role === 'super')
-                        <a href="{{ route('admins.index') }}">Admin Management</a>
-                    @elseif(Auth::guard('admin')->user()->role === 'manager')
-                        <a href="{{ route('admins.index') }}">Manage Team</a>
+        <div class="admin-shell">
+            <header class="admin-header">
+                <a class="admin-brand" href="{{ route('dashboard.index') }}">千兴工作台</a>
+                <div class="admin-account">
+                    <span class="admin-account-name">{{ $admin->name }}</span>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="admin-logout">退出登录</button>
+                    </form>
+                </div>
+            </header>
+
+            <aside class="admin-sidebar" aria-label="主导航">
+                <nav class="admin-nav">
+                    @foreach ($navItems as $item)
+                        @php
+                            $routeAvailable = Route::has($item['route']);
+                            $isActive = request()->routeIs(...$item['patterns']);
+                        @endphp
+                        @if ($routeAvailable)
+                            <a class="admin-nav-link {{ $isActive ? 'is-active' : '' }}"
+                               href="{{ route($item['route']) }}"
+                               @if ($isActive) aria-current="page" @endif>
+                                {{ $item['label'] }}
+                            </a>
+                        @else
+                            <span class="admin-nav-link is-disabled" aria-disabled="true">{{ $item['label'] }}</span>
+                        @endif
+                    @endforeach
+
+                    @if (Gate::forUser($admin)->allows('viewAny', \App\Models\Employee::class) || Gate::forUser($admin)->allows('viewAny', \App\Models\Position::class))
+                        @php
+                            $staffRoute = Route::has('employees.index') ? 'employees.index' : (Route::has('positions.index') ? 'positions.index' : null);
+                            $staffActive = request()->routeIs('employees.*', 'positions.*');
+                        @endphp
+                        @if ($staffRoute)
+                            <a class="admin-nav-link {{ $staffActive ? 'is-active' : '' }}"
+                               href="{{ route($staffRoute) }}"
+                               @if ($staffActive) aria-current="page" @endif>
+                                员工与职位
+                            </a>
+                        @else
+                            <span class="admin-nav-link is-disabled" aria-disabled="true">员工与职位</span>
+                        @endif
                     @endif
-                @endauth
-                <a href="{{ route('data-processing.index') }}">Data Processing</a>
-            </div>
-        </div>
 
-        <div style="flex: 1; padding: 20px;">
-            @yield('content')
+                    @if (Gate::forUser($admin)->allows('viewAny', \App\Models\Admin::class))
+                        @php($adminActive = request()->routeIs('admins.*'))
+                        @if (Route::has('admins.index'))
+                            <a class="admin-nav-link {{ $adminActive ? 'is-active' : '' }}"
+                               href="{{ route('admins.index') }}"
+                               @if ($adminActive) aria-current="page" @endif>
+                                管理员管理
+                            </a>
+                        @else
+                            <span class="admin-nav-link is-disabled" aria-disabled="true">管理员管理</span>
+                        @endif
+                    @endif
+                </nav>
+            </aside>
+
+            <main class="admin-content">
+    @else
+        <main class="guest-content">
+    @endauth
+        <x-flash />
+        <x-form-errors />
+        @yield('content')
+    </main>
+    @auth('admin')
         </div>
-    </div>
+    @endauth
+    <x-confirm-delete />
 </body>
 </html>
