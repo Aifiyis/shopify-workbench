@@ -3,6 +3,8 @@
 @section('content')
     @php
         $tabQuery = request()->except(['tab', 'sku_page', 'type_page']);
+        $canManageSku = Gate::forUser(Auth::guard('admin')->user())
+            ->allows('create', \App\Models\SkuMatchProductType::class);
     @endphp
 
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 pb-4">
@@ -61,6 +63,11 @@
     <div class="mt-5">
         @if ($activeTab === 'skus')
             @include('business.sku-product-types._sku-table')
+            @if ($canManageSku)
+                <x-sku-bulk-edit-dialog
+                    :product-types="$typeOptions"
+                    :eligible-listers="$eligibleListers" />
+            @endif
         @else
             @include('business.sku-product-types._type-table')
         @endif

@@ -184,6 +184,106 @@ class SkuProductTypeCrudTest extends TestCase
         }
     }
 
+    public function test_sku_and_product_type_lists_use_independent_configurable_pagination()
+    {
+        $viewer = $this->createActor('finance');
+        $skuType = ProductType::create(['chinese_name' => '分页 SKU 类型']);
+
+        for ($index = 1; $index <= 45; $index++) {
+            $this->createSku(
+                $skuType,
+                'PAGER-SKU-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT)
+            );
+        }
+        for ($index = 1; $index <= 25; $index++) {
+            ProductType::create([
+                'chinese_name' => 'TYPE-PAGER-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+            ]);
+        }
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('sku-product-types.index', [
+                'tab' => 'skus',
+                'search' => 'PAGER-SKU',
+                'sku_page' => 2,
+                'sku_per_page' => 20,
+            ]))
+            ->assertOk()
+            ->assertViewHas('skuMatches', function ($paginator) {
+                return $paginator->perPage() === 20
+                    && $paginator->currentPage() === 2
+                    && $paginator->count() === 20
+                    && str_contains($paginator->nextPageUrl(), 'search=PAGER-SKU')
+                    && str_contains($paginator->nextPageUrl(), 'sku_per_page=20');
+            })
+            ->assertSee('name="sku_per_page"', false)
+            ->assertSee('name="sku_page"', false);
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('sku-product-types.index', [
+                'tab' => 'types',
+                'search' => 'TYPE-PAGER',
+                'type_page' => 2,
+                'type_per_page' => 20,
+            ]))
+            ->assertOk()
+            ->assertViewHas('productTypes', function ($paginator) {
+                return $paginator->perPage() === 20
+                    && $paginator->currentPage() === 2
+                    && $paginator->count() === 5
+                    && str_contains($paginator->previousPageUrl(), 'type_per_page=20');
+            })
+            ->assertSee('name="type_per_page"', false)
+            ->assertSee('name="type_page"', false);
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('sku-product-types.index', ['sku_per_page' => 999]))
+            ->assertOk()
+            ->assertViewHas('skuMatches', function ($paginator) {
+                return $paginator->perPage() === 50;
+            });
+    }
+
+    public function test_bulk_dialog_and_create_only_clean_button_follow_management_permission()
+    {
+        $manager = $this->createActor('advertising');
+        $viewer = $this->createActor('finance');
+        $type = ProductType::create(['chinese_name' => '界面权限类型']);
+        $first = $this->createSku($type, 'UI-BULK-1');
+        $second = $this->createSku($type, 'UI-BULK-2');
+        $first->update(['cleaned_sku' => 'UI-SHARED-CLEAN']);
+        $second->update(['cleaned_sku' => 'UI-SHARED-CLEAN']);
+
+        $this->actingAs($manager, 'admin')
+            ->get(route('sku-product-types.index', [
+                'search' => 'UI-SHARED-CLEAN',
+                'sku_per_page' => 20,
+            ]))
+            ->assertOk()
+            ->assertSee(route('sku-product-types.bulk-update'), false)
+            ->assertSee('data-sku-bulk-checkbox', false)
+            ->assertSee('data-cleaned-sku="UI-SHARED-CLEAN"', false)
+            ->assertSee('return_query[search]', false)
+            ->assertSee('return_query[sku_per_page]', false);
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('sku-product-types.index', ['search' => 'UI-SHARED-CLEAN']))
+            ->assertOk()
+            ->assertDontSee('data-sku-bulk-checkbox', false)
+            ->assertDontSee(route('sku-product-types.bulk-update'), false);
+
+        $this->actingAs($manager, 'admin')
+            ->get(route('sku-product-types.create'))
+            ->assertOk()
+            ->assertSee('data-sku-clean-trigger', false)
+            ->assertSee(route('sku-product-types.clean-sku'), false);
+
+        $this->actingAs($manager, 'admin')
+            ->get(route('sku-product-types.edit', $first))
+            ->assertOk()
+            ->assertDontSee('data-sku-clean-trigger', false);
+    }
+
     public function test_advertising_and_operations_actors_create_update_and_soft_delete_sku_snapshots()
     {
         foreach (['advertising', 'operations'] as $code) {

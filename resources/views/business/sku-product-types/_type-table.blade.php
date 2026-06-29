@@ -53,18 +53,8 @@
     </table>
 </div>
 
-@if ($productTypes->hasPages())
-    <nav class="mt-4 flex items-center justify-end gap-3 text-sm" aria-label="产品类型分页">
-        @if ($productTypes->onFirstPage())
-            <span class="text-gray-400">上一页</span>
-        @else
-            <a href="{{ $productTypes->previousPageUrl() }}">上一页</a>
-        @endif
-        <span>第 {{ $productTypes->currentPage() }} 页，共 {{ $productTypes->lastPage() }} 页</span>
-        @if ($productTypes->hasMorePages())
-            <a href="{{ $productTypes->nextPageUrl() }}">下一页</a>
-        @else
-            <span class="text-gray-400">下一页</span>
-        @endif
-    </nav>
-@endif
+<x-business-pagination
+    :paginator="$productTypes"
+    page-name="type_page"
+    per-page-name="type_per_page"
+    aria-label="产品类型分页" />

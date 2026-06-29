@@ -116,6 +116,45 @@ class OrderProcessingCrudTest extends TestCase
             });
     }
 
+    public function test_order_processing_list_supports_per_page_and_page_jump_parameters()
+    {
+        $viewer = $this->createActor('finance');
+
+        for ($index = 1; $index <= 45; $index++) {
+            $type = ProductType::create([
+                'chinese_name' => 'ORDER-PAGER-'.str_pad((string) $index, 3, '0', STR_PAD_LEFT),
+            ]);
+            ProductProcessingCraft::create([
+                'product_type_id' => $type->id,
+                'chinese_name' => $type->chinese_name,
+            ]);
+        }
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('order-processing.index', [
+                'search' => 'ORDER-PAGER',
+                'page' => 2,
+                'per_page' => 20,
+            ]))
+            ->assertOk()
+            ->assertViewHas('configurations', function ($paginator) {
+                return $paginator->perPage() === 20
+                    && $paginator->currentPage() === 2
+                    && $paginator->count() === 20
+                    && str_contains($paginator->nextPageUrl(), 'search=ORDER-PAGER')
+                    && str_contains($paginator->nextPageUrl(), 'per_page=20');
+            })
+            ->assertSee('name="per_page"', false)
+            ->assertSee('name="page"', false);
+
+        $this->actingAs($viewer, 'admin')
+            ->get(route('order-processing.index', ['per_page' => 21]))
+            ->assertOk()
+            ->assertViewHas('configurations', function ($paginator) {
+                return $paginator->perPage() === 50;
+            });
+    }
+
     public function test_processing_positions_are_authorized_to_create_update_and_delete()
     {
         foreach (['procurement', 'order_processing', 'artwork_processing'] as $code) {

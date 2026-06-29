@@ -128,19 +128,9 @@
         </table>
     </div>
 
-    @if ($configurations->hasPages())
-        <nav class="mt-4 flex items-center justify-end gap-3 text-sm" aria-label="订单处理配置分页">
-            @if ($configurations->onFirstPage())
-                <span class="text-gray-400">上一页</span>
-            @else
-                <a href="{{ $configurations->previousPageUrl() }}">上一页</a>
-            @endif
-            <span>第 {{ $configurations->currentPage() }} 页，共 {{ $configurations->lastPage() }} 页</span>
-            @if ($configurations->hasMorePages())
-                <a href="{{ $configurations->nextPageUrl() }}">下一页</a>
-            @else
-                <span class="text-gray-400">下一页</span>
-            @endif
-        </nav>
-    @endif
+    <x-business-pagination
+        :paginator="$configurations"
+        page-name="page"
+        per-page-name="per_page"
+        aria-label="订单处理配置分页" />
 @endsection

@@ -21,7 +21,20 @@
             <div class="grid gap-5 md:grid-cols-2">
                 <div>
                     <label for="original_sku" class="mb-1 block font-semibold">原始 SKU</label>
-                    <input id="original_sku" name="original_sku" required maxlength="255" value="{{ old('original_sku', $skuMatch->original_sku) }}">
+                    <div class="flex items-center gap-2">
+                        <input id="original_sku" name="original_sku" required maxlength="255" value="{{ old('original_sku', $skuMatch->original_sku) }}">
+                        @if (!$editing)
+                            <button type="button"
+                                    class="button button-secondary shrink-0"
+                                    data-sku-clean-trigger
+                                    data-clean-url="{{ route('sku-product-types.clean-sku') }}">
+                                清洗 SKU
+                            </button>
+                        @endif
+                    </div>
+                    @if (!$editing)
+                        <div class="mt-1 text-sm text-red-700" data-sku-clean-feedback role="status" aria-live="polite"></div>
+                    @endif
                 </div>
                 <div>
                     <label for="cleaned_sku" class="mb-1 block font-semibold">清洗后 SKU</label>

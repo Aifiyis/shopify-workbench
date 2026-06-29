@@ -289,6 +289,72 @@ a {
     background: rgba(20, 25, 22, 0.45);
 }
 
+.sku-bulk-dialog {
+    width: min(560px, calc(100% - 32px));
+    padding: 0;
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+    color: #202522;
+    background: #ffffff;
+    box-shadow: 0 16px 40px rgba(23, 31, 26, 0.2);
+}
+
+.sku-bulk-dialog::backdrop {
+    background: rgba(20, 25, 22, 0.45);
+}
+
+.sku-bulk-dialog-content {
+    padding: 20px;
+}
+
+.sku-bulk-dialog-content h2 {
+    margin: 0 0 8px;
+}
+
+.sku-bulk-dialog-summary {
+    margin: 0;
+    color: var(--admin-muted);
+    line-height: 1.6;
+}
+
+.sku-bulk-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.business-pagination {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px 18px;
+    margin-top: 16px;
+    font-size: 13px;
+}
+
+.business-pagination-summary {
+    color: var(--admin-muted);
+}
+
+.business-pagination-form,
+.business-pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-content .business-pagination select {
+    width: auto;
+    min-width: 82px;
+}
+
+.admin-content .business-pagination input:not([type="hidden"]) {
+    width: 68px;
+    min-height: 36px;
+}
+
 .confirm-delete-content {
     padding: 20px;
 }
@@ -432,8 +498,17 @@ a {
         flex-direction: column-reverse;
     }
 
-    .confirm-delete-actions .button {
+    .confirm-delete-actions .button,
+    .sku-bulk-dialog-actions .button {
         width: 100%;
+    }
+
+    .sku-bulk-dialog-actions {
+        flex-direction: column-reverse;
+    }
+
+    .business-pagination {
+        justify-content: flex-start;
     }
 }
 

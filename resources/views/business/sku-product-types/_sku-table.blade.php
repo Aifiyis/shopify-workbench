@@ -1,7 +1,19 @@
-<div class="overflow-x-auto border border-gray-200 bg-white">
-    <table>
+<div data-sku-bulk-root>
+    @if ($canManageSku)
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+            <span class="text-sm text-gray-600">已选择 <strong data-sku-bulk-count>0</strong> 条</span>
+            <button type="button" class="button button-secondary" data-sku-bulk-select-group>全选同组</button>
+            <button type="button" class="button bg-green-700 text-white hover:bg-green-800" data-sku-bulk-open disabled>批量修改</button>
+            <span class="text-sm text-red-700" data-sku-bulk-feedback role="status" aria-live="polite"></span>
+        </div>
+    @endif
+    <div class="overflow-x-auto border border-gray-200 bg-white">
+        <table>
         <thead>
             <tr>
+                @if ($canManageSku)
+                    <th class="w-12"><span class="sr-only">选择</span></th>
+                @endif
                 <th>原始 SKU</th>
                 <th>清洗后 SKU</th>
                 <th>产品类型</th>
@@ -12,6 +24,15 @@
         <tbody>
             @forelse ($skuMatches as $skuMatch)
                 <tr>
+                    @if ($canManageSku)
+                        <td>
+                            <input type="checkbox"
+                                   value="{{ $skuMatch->id }}"
+                                   aria-label="选择 {{ $skuMatch->original_sku }}"
+                                   data-sku-bulk-checkbox
+                                   data-cleaned-sku="{{ $skuMatch->cleaned_sku }}">
+                        </td>
+                    @endif
                     <td class="font-medium">{{ $skuMatch->original_sku }}</td>
                     <td>{{ $skuMatch->cleaned_sku }}</td>
                     <td>{{ optional($skuMatch->productType)->chinese_name ?: $skuMatch->chinese_name }}</td>
@@ -40,25 +61,16 @@
                 </tr>
             @empty
                 <tr>
-                    <td colspan="5" class="py-10 text-center text-gray-500">没有符合条件的 SKU 映射。</td>
+                    <td colspan="{{ $canManageSku ? 6 : 5 }}" class="py-10 text-center text-gray-500">没有符合条件的 SKU 映射。</td>
                 </tr>
             @endforelse
         </tbody>
-    </table>
+        </table>
+    </div>
 </div>
 
-@if ($skuMatches->hasPages())
-    <nav class="mt-4 flex items-center justify-end gap-3 text-sm" aria-label="SKU 映射分页">
-        @if ($skuMatches->onFirstPage())
-            <span class="text-gray-400">上一页</span>
-        @else
-            <a href="{{ $skuMatches->previousPageUrl() }}">上一页</a>
-        @endif
-        <span>第 {{ $skuMatches->currentPage() }} 页，共 {{ $skuMatches->lastPage() }} 页</span>
-        @if ($skuMatches->hasMorePages())
-            <a href="{{ $skuMatches->nextPageUrl() }}">下一页</a>
-        @else
-            <span class="text-gray-400">下一页</span>
-        @endif
-    </nav>
-@endif
+<x-business-pagination
+    :paginator="$skuMatches"
+    page-name="sku_page"
+    per-page-name="sku_per_page"
+    aria-label="SKU 映射分页" />

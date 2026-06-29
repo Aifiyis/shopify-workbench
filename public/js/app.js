@@ -19808,9 +19808,152 @@ function initializeDeleteDialog() {
   });
   dialog.dataset.adminUiInitialized = 'true';
 }
+function initializeSkuBulkEditors() {
+  document.querySelectorAll('[data-sku-bulk-root]').forEach(function (root) {
+    if (root.dataset.adminUiInitialized === 'true') {
+      return;
+    }
+    var checkboxes = Array.from(root.querySelectorAll('[data-sku-bulk-checkbox]'));
+    var count = root.querySelector('[data-sku-bulk-count]');
+    var feedback = root.querySelector('[data-sku-bulk-feedback]');
+    var selectGroup = root.querySelector('[data-sku-bulk-select-group]');
+    var open = root.querySelector('[data-sku-bulk-open]');
+    var dialog = document.getElementById('sku-bulk-edit-dialog');
+    if (!checkboxes.length || !dialog || !open) {
+      root.dataset.adminUiInitialized = 'true';
+      return;
+    }
+    var hiddenInputs = dialog.querySelector('[data-sku-bulk-hidden-inputs]');
+    var dialogCount = dialog.querySelector('[data-sku-bulk-dialog-count]');
+    var dialogGroup = dialog.querySelector('[data-sku-bulk-dialog-group]');
+    var cancel = dialog.querySelector('[data-sku-bulk-cancel]');
+    function selectedRows() {
+      return checkboxes.filter(function (checkbox) {
+        return checkbox.checked;
+      });
+    }
+    function updateState(message) {
+      var selected = selectedRows();
+      var group = selected.length ? selected[0].dataset.cleanedSku : '';
+      checkboxes.forEach(function (checkbox) {
+        checkbox.disabled = group !== '' && !checkbox.checked && checkbox.dataset.cleanedSku !== group;
+      });
+      count.textContent = String(selected.length);
+      open.disabled = selected.length < 2;
+      feedback.textContent = message || '';
+    }
+    checkboxes.forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () {
+        var other = selectedRows().find(function (selected) {
+          return selected !== checkbox;
+        });
+        if (checkbox.checked && other && other.dataset.cleanedSku !== checkbox.dataset.cleanedSku) {
+          checkbox.checked = false;
+          updateState('只能选择清洗后 SKU 完全相同的记录。');
+          return;
+        }
+        updateState('');
+      });
+    });
+    selectGroup.addEventListener('click', function () {
+      var selected = selectedRows();
+      if (!selected.length) {
+        updateState('请先勾选一条记录，再全选同组。');
+        return;
+      }
+      var group = selected[0].dataset.cleanedSku;
+      checkboxes.forEach(function (checkbox) {
+        checkbox.checked = checkbox.dataset.cleanedSku === group;
+      });
+      updateState('');
+    });
+    open.addEventListener('click', function () {
+      var selected = selectedRows();
+      if (selected.length < 2) {
+        updateState('请至少选择两条记录。');
+        return;
+      }
+      hiddenInputs.replaceChildren();
+      selected.forEach(function (checkbox) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'sku_ids[]';
+        input.value = checkbox.value;
+        hiddenInputs.appendChild(input);
+      });
+      dialogCount.textContent = String(selected.length);
+      dialogGroup.textContent = selected[0].dataset.cleanedSku;
+      initializeSearchableSelects(dialog);
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      }
+    });
+    cancel.addEventListener('click', function () {
+      dialog.close();
+    });
+    dialog.addEventListener('close', function () {
+      hiddenInputs.replaceChildren();
+    });
+    root.dataset.adminUiInitialized = 'true';
+    updateState('');
+  });
+}
+function initializeSkuCleaners() {
+  document.querySelectorAll('[data-sku-clean-trigger]').forEach(function (trigger) {
+    if (trigger.dataset.adminUiInitialized === 'true') {
+      return;
+    }
+    var original = document.getElementById('original_sku');
+    var cleaned = document.getElementById('cleaned_sku');
+    var feedback = document.querySelector('[data-sku-clean-feedback]');
+    var csrf = document.querySelector('meta[name="csrf-token"]');
+    var defaultLabel = trigger.textContent;
+    trigger.addEventListener('click', function () {
+      feedback.textContent = '';
+      trigger.disabled = true;
+      trigger.textContent = '清洗中...';
+      fetch(trigger.dataset.cleanUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-CSRF-TOKEN': csrf ? csrf.content : ''
+        },
+        body: JSON.stringify({
+          original_sku: original.value
+        })
+      }).then(function (response) {
+        return response.json()["catch"](function () {
+          return {};
+        }).then(function (data) {
+          return {
+            ok: response.ok,
+            data: data
+          };
+        });
+      }).then(function (result) {
+        if (!result.ok) {
+          var errors = result.data.errors && result.data.errors.original_sku;
+          feedback.textContent = errors && errors.length ? errors[0] : result.data.message || 'SKU 清洗失败，请稍后重试。';
+          return;
+        }
+        cleaned.value = result.data.cleaned_sku || '';
+      })["catch"](function () {
+        feedback.textContent = 'SKU 清洗失败，请稍后重试。';
+      })["finally"](function () {
+        trigger.disabled = false;
+        trigger.textContent = defaultLabel;
+      });
+    });
+    trigger.dataset.adminUiInitialized = 'true';
+  });
+}
 function initializeAdminUI() {
   initializeSearchableSelects(document);
   initializeDeleteDialog();
+  initializeSkuBulkEditors();
+  initializeSkuCleaners();
 }
 window.AdminUI = Object.assign(window.AdminUI || {}, {
   addSelectOption: addSelectOption,

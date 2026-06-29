@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\ProductType;
 use App\Models\SkuMatchProductType;
 use App\Services\SkuCleaningService;
+use App\Support\PerPageOptions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +23,8 @@ class SkuMatchProductTypeController extends Controller
 
         $search = trim((string) $request->query('search', ''));
         $productTypeId = $request->query('product_type_id');
+        $skuPerPage = PerPageOptions::resolve($request, 'sku_per_page');
+        $typePerPage = PerPageOptions::resolve($request, 'type_per_page');
 
         $skuQuery = SkuMatchProductType::query()
             ->with(['productType', 'productListerEmployee'])
@@ -67,14 +70,15 @@ class SkuMatchProductTypeController extends Controller
             'search' => $search,
             'selectedProductTypeId' => $productTypeId,
             'skuMatches' => $skuQuery
-                ->paginate(50, ['*'], 'sku_page')
+                ->paginate($skuPerPage, ['*'], 'sku_page')
                 ->withQueryString(),
             'productTypes' => $typeQuery
-                ->paginate(50, ['*'], 'type_page')
+                ->paginate($typePerPage, ['*'], 'type_page')
                 ->withQueryString(),
             'typeOptions' => ProductType::query()
                 ->orderBy('chinese_name')
                 ->get(['id', 'chinese_name']),
+            'eligibleListers' => $this->eligibleListers(),
         ]);
     }
 
@@ -144,6 +148,12 @@ class SkuMatchProductTypeController extends Controller
         $skuMatches = SkuMatchProductType::query()
             ->whereIn('id', $validated['sku_ids'])
             ->get();
+
+        if ($skuMatches->count() !== count($validated['sku_ids'])) {
+            throw ValidationException::withMessages([
+                'sku_ids' => '部分 SKU 映射不存在或已删除，请刷新页面后重试。',
+            ]);
+        }
 
         foreach ($skuMatches as $skuMatch) {
             $this->authorize('update', $skuMatch);

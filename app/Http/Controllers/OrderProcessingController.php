@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\ProcessingCraftNode;
 use App\Models\ProductProcessingCraft;
 use App\Models\ProductType;
+use App\Support\PerPageOptions;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class OrderProcessingController extends Controller
         $search = trim((string) $request->query('search', ''));
         $productTypeId = $request->query('product_type_id');
         $craftId = $request->query('craft_id');
+        $perPage = PerPageOptions::resolve($request, 'per_page');
 
         $query = ProductProcessingCraft::query()
             ->with([
@@ -77,7 +79,7 @@ class OrderProcessingController extends Controller
         }
 
         return view('business.order-processing.index', [
-            'configurations' => $query->paginate(50)->withQueryString(),
+            'configurations' => $query->paginate($perPage)->withQueryString(),
             'search' => $search,
             'selectedProductTypeId' => $productTypeId,
             'selectedCraftId' => $craftId,
