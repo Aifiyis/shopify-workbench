@@ -104,7 +104,7 @@ class DataProcessingRouteTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('existing_order.xlsx');
-        $response->assertSee('Expired');
-        $response->assertDontSee('Download All');
+        $response->assertSee('已过期');
+        $response->assertDontSee('下载全部');
     }
 }
