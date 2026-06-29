@@ -27,22 +27,32 @@ class DataProcessingController extends Controller
     {
         $admin = Auth::guard('admin')->user();
 
+        // Clean first so the paginator does not hold records that were deleted mid-request.
+        $this->fileExpirationService->cleanExpiredFiles();
+
         // Get user's processed files
         $processedFiles = ProcessedFile::where('admin_id', $admin->id)
             ->orderBy('uploaded_at', 'desc')
             ->paginate(10);
 
-        // Check for expired files and clean them up
-        $this->fileExpirationService->cleanExpiredFiles();
-
         // Add expiry info to each file
         foreach ($processedFiles as $file) {
-            $file->expiry_info = $this->fileExpirationService->getExpiryInfo($file->id);
+            $file->expiry_info = $this->fileExpirationService->getExpiryInfo($file->id)
+                ?: $this->missingExpiryInfo($file);
         }
 
         return view('data-processing.index', [
             'processedFiles' => $processedFiles,
         ]);
+    }
+
+    private function missingExpiryInfo(ProcessedFile $file)
+    {
+        return [
+            'expires_at' => $file->expires_at,
+            'expires_in_minutes' => 0,
+            'is_expired' => true,
+        ];
     }
 
     public function upload(Request $request)

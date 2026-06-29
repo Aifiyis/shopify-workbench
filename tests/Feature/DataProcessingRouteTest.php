@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Admin;
+use App\Models\ProcessedFile;
 use App\Services\DataProcessingService;
+use App\Services\FileExpirationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
@@ -69,5 +71,40 @@ class DataProcessingRouteTest extends TestCase
             'original_filename' => 'order_0524 21-0526 09-ln.xlsx',
             'status' => 'processing',
         ]);
+    }
+
+    public function test_index_handles_missing_expiry_info_without_rendering_error()
+    {
+        $admin = Admin::create([
+            'name' => 'Test Admin',
+            'email' => 'expired-admin@example.test',
+            'password' => Hash::make('password'),
+            'role' => 'super',
+            'is_active' => true,
+        ]);
+
+        ProcessedFile::create([
+            'admin_id' => $admin->id,
+            'original_filename' => 'existing_order.xlsx',
+            'processed_filename' => 'existing_order.zip',
+            'file_path' => storage_path('app/public/processed_files/existing_order.zip'),
+            'status' => 'completed',
+            'uploaded_at' => now(),
+            'expires_at' => now()->addHour(),
+            'is_downloaded' => false,
+        ]);
+
+        $this->mock(FileExpirationService::class, function ($mock) {
+            $mock->shouldReceive('cleanExpiredFiles')->once()->andReturn(0);
+            $mock->shouldReceive('getExpiryInfo')->once()->andReturn(null);
+        });
+
+        $response = $this->actingAs($admin, 'admin')
+            ->get('/data-processing');
+
+        $response->assertOk();
+        $response->assertSee('existing_order.xlsx');
+        $response->assertSee('Expired');
+        $response->assertDontSee('Download All');
     }
 }
