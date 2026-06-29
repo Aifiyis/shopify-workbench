@@ -9,8 +9,10 @@ use App\Models\Position;
 use App\Models\ProductProcessingCraft;
 use App\Models\ProductType;
 use App\Models\SkuMatchProductType;
+use App\Services\SkuCleaningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Mockery;
 use Tests\TestCase;
 
 class SkuProductTypeCrudTest extends TestCase
@@ -463,6 +465,124 @@ class SkuProductTypeCrudTest extends TestCase
         $this->actingAs($viewer, 'admin')
             ->get(route('product-types.index'))
             ->assertRedirect(route('sku-product-types.index', ['tab' => 'types']));
+    }
+
+    public function test_bulk_update_changes_same_cleaned_sku_snapshots_and_preserves_return_query()
+    {
+        $actor = $this->createActor('advertising');
+        $initialType = ProductType::create(['chinese_name' => '批量初始类型']);
+        $updatedType = ProductType::create(['chinese_name' => '批量更新类型']);
+        $lister = $this->createEmployee('批量上品人', 'operations');
+        $first = $this->createSku($initialType, 'BULK-RAW-1');
+        $second = $this->createSku($initialType, 'BULK-RAW-2');
+        $first->update(['cleaned_sku' => 'BULK-SHARED-CLEAN']);
+        $second->update(['cleaned_sku' => 'BULK-SHARED-CLEAN']);
+        $returnQuery = [
+            'tab' => 'skus',
+            'search' => 'BULK-SHARED-CLEAN',
+            'product_type_id' => $initialType->id,
+            'sku_page' => 2,
+            'sku_per_page' => 20,
+        ];
+
+        $this->actingAs($actor, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $second->id],
+                'product_type_id' => $updatedType->id,
+                'product_lister_employee_id' => $lister->id,
+                'return_query' => $returnQuery,
+            ])
+            ->assertRedirect(route('sku-product-types.index', $returnQuery))
+            ->assertSessionHas('success');
+
+        foreach ([$first, $second] as $sku) {
+            $sku->refresh();
+            $this->assertEquals($updatedType->id, $sku->product_type_id);
+            $this->assertSame($updatedType->chinese_name, $sku->chinese_name);
+            $this->assertEquals($lister->id, $sku->product_lister_employee_id);
+            $this->assertSame($lister->name, $sku->product_lister);
+            $this->assertSame('BULK-SHARED-CLEAN', $sku->cleaned_sku);
+        }
+    }
+
+    public function test_bulk_update_rejects_mixed_deleted_duplicate_ineligible_and_unauthorized_records()
+    {
+        $actor = $this->createActor('operations');
+        $viewer = $this->createActor('finance');
+        $type = ProductType::create(['chinese_name' => '批量校验类型']);
+        $first = $this->createSku($type, 'VALIDATION-RAW-1');
+        $second = $this->createSku($type, 'VALIDATION-RAW-2');
+        $deleted = $this->createSku($type, 'VALIDATION-DELETED');
+        $deleted->delete();
+        $ineligible = $this->createEmployee('无效批量上品人', 'finance');
+
+        $this->actingAs($actor, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $second->id],
+                'product_type_id' => $type->id,
+            ])
+            ->assertSessionHasErrors('sku_ids');
+
+        $this->actingAs($actor, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $deleted->id],
+                'product_type_id' => $type->id,
+            ])
+            ->assertSessionHasErrors('sku_ids.1');
+
+        $this->actingAs($actor, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $first->id],
+                'product_type_id' => $type->id,
+            ])
+            ->assertSessionHasErrors('sku_ids.1');
+
+        $first->update(['cleaned_sku' => 'VALIDATION-SHARED']);
+        $second->update(['cleaned_sku' => 'VALIDATION-SHARED']);
+        $this->actingAs($actor, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $second->id],
+                'product_type_id' => $type->id,
+                'product_lister_employee_id' => $ineligible->id,
+            ])
+            ->assertSessionHasErrors('product_lister_employee_id');
+
+        $this->actingAs($viewer, 'admin')
+            ->post(route('sku-product-types.bulk-update'), [
+                'sku_ids' => [$first->id, $second->id],
+                'product_type_id' => $type->id,
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_authorized_actor_can_clean_sku_and_invalid_or_unauthorized_requests_fail()
+    {
+        $actor = $this->createActor('advertising');
+        $viewer = $this->createActor('finance');
+        $cleaner = Mockery::mock(SkuCleaningService::class);
+        $cleaner->shouldReceive('cleanSkuUsingValuesAndPatterns')
+            ->once()
+            ->with('CS-QK1000-Blue-XL')
+            ->andReturn('CS-QK1000');
+        $this->app->instance(SkuCleaningService::class, $cleaner);
+
+        $this->actingAs($actor, 'admin')
+            ->postJson(route('sku-product-types.clean-sku'), [
+                'original_sku' => '  CS-QK1000-Blue-XL  ',
+            ])
+            ->assertOk()
+            ->assertJson(['cleaned_sku' => 'CS-QK1000']);
+
+        $this->actingAs($actor, 'admin')
+            ->postJson(route('sku-product-types.clean-sku'), ['original_sku' => '   '])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('original_sku');
+
+        $this->actingAs($viewer, 'admin')
+            ->postJson(route('sku-product-types.clean-sku'), [
+                'original_sku' => 'CS-QK1000-Blue-XL',
+            ])
+            ->assertForbidden();
     }
 
     private function createActor($positionCode)

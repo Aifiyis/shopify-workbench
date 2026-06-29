@@ -29,6 +29,10 @@ Route::middleware('auth:admin')->group(function () {
     Route::resource('employees', EmployeeController::class)->except('show');
     Route::resource('positions', PositionController::class)->except('show');
 
+    Route::post('sku-product-types/bulk-update', [SkuMatchProductTypeController::class, 'bulkUpdate'])
+        ->name('sku-product-types.bulk-update');
+    Route::post('sku-product-types/clean-sku', [SkuMatchProductTypeController::class, 'cleanSku'])
+        ->name('sku-product-types.clean-sku');
     Route::resource('sku-product-types', SkuMatchProductTypeController::class)->except('show');
     Route::post('product-types/quick-create', [ProductTypeController::class, 'quickStore'])
         ->name('product-types.quick-store');

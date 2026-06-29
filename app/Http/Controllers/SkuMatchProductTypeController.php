@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\BulkUpdateSkuMatchProductTypeRequest;
 use App\Http\Requests\StoreSkuMatchProductTypeRequest;
 use App\Http\Requests\UpdateSkuMatchProductTypeRequest;
 use App\Models\Employee;
 use App\Models\ProductType;
 use App\Models\SkuMatchProductType;
+use App\Services\SkuCleaningService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class SkuMatchProductTypeController extends Controller
 {
@@ -134,18 +138,83 @@ class SkuMatchProductTypeController extends Controller
             ->with('success', 'SKU 映射已删除。');
     }
 
-    private function snapshotData(array $validated)
+    public function bulkUpdate(BulkUpdateSkuMatchProductTypeRequest $request)
     {
-        $productType = ProductType::query()->findOrFail($validated['product_type_id']);
-        $lister = null;
+        $validated = $request->validated();
+        $skuMatches = SkuMatchProductType::query()
+            ->whereIn('id', $validated['sku_ids'])
+            ->get();
 
-        if (!empty($validated['product_lister_employee_id'])) {
-            $lister = Employee::query()->findOrFail($validated['product_lister_employee_id']);
+        foreach ($skuMatches as $skuMatch) {
+            $this->authorize('update', $skuMatch);
         }
 
-        return [
+        if ($skuMatches->pluck('cleaned_sku')->unique()->count() !== 1) {
+            throw ValidationException::withMessages([
+                'sku_ids' => '只能批量修改清洗后 SKU 完全相同的记录。',
+            ]);
+        }
+
+        $snapshot = $this->assignmentSnapshotData(
+            $validated['product_type_id'],
+            $validated['product_lister_employee_id'] ?? null
+        );
+
+        DB::transaction(function () use ($skuMatches, $snapshot) {
+            SkuMatchProductType::query()
+                ->whereIn('id', $skuMatches->pluck('id'))
+                ->update($snapshot);
+        });
+
+        $returnQuery = collect($validated['return_query'] ?? [])
+            ->reject(function ($value) {
+                return $value === null || $value === '';
+            })
+            ->all();
+
+        return redirect()
+            ->route('sku-product-types.index', $returnQuery)
+            ->with('success', '已批量更新 '.$skuMatches->count().' 条 SKU 映射。');
+    }
+
+    public function cleanSku(Request $request, SkuCleaningService $cleaner)
+    {
+        $this->authorize('create', SkuMatchProductType::class);
+        $request->merge([
+            'original_sku' => trim((string) $request->input('original_sku')),
+        ]);
+        $validated = $request->validate([
+            'original_sku' => ['required', 'string', 'max:255'],
+        ], [
+            'original_sku.required' => '请输入原始 SKU。',
+        ]);
+
+        return response()->json([
+            'cleaned_sku' => $cleaner->cleanSkuUsingValuesAndPatterns(
+                $validated['original_sku']
+            ),
+        ]);
+    }
+
+    private function snapshotData(array $validated)
+    {
+        return array_merge([
             'original_sku' => $validated['original_sku'],
             'cleaned_sku' => $validated['cleaned_sku'],
+        ], $this->assignmentSnapshotData(
+            $validated['product_type_id'],
+            $validated['product_lister_employee_id'] ?? null
+        ));
+    }
+
+    private function assignmentSnapshotData($productTypeId, $listerEmployeeId)
+    {
+        $productType = ProductType::query()->findOrFail($productTypeId);
+        $lister = $listerEmployeeId
+            ? Employee::query()->findOrFail($listerEmployeeId)
+            : null;
+
+        return [
             'product_type_id' => $productType->id,
             'chinese_name' => $productType->chinese_name,
             'product_lister_employee_id' => $lister ? $lister->id : null,
