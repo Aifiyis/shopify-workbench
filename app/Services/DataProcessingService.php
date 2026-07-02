@@ -230,6 +230,7 @@ class DataProcessingService
                 $productSpecs = $this->getCellValue($sourceSheet, $sourceColumns['specs'], $row);
                 $productImage = $this->getCellValue($sourceSheet, $sourceColumns['picture'], $row);
                 $quantity = $this->getCellValue($sourceSheet, $sourceColumns['quantity'], $row);
+                $productLink = $this->getCellValue($sourceSheet, $sourceColumns['product_link'], $row);
 
                 if ($this->isBlank($orderId)) {
                     continue;
@@ -249,6 +250,7 @@ class DataProcessingService
                     'cleaned_sku' => $resolvedSku['cleaned_sku'] ?? '',
                     'chinese_name' => '彩图刺绣',
                     'product_specs' => $productSpecs,
+                    'product_link' => $productLink ?? '',
                     'product_image' => $productImage ?? '',
                     'quantity' => $quantity ?? '',
                     'style' => $style ?? '',
@@ -369,6 +371,7 @@ class DataProcessingService
             $productSpecs = $this->getCellValue($sourceSheet, $sourceColumns['specs'], $row);
             $productImage = $this->getCellValue($sourceSheet, $pictureColumn, $row);
             $quantity = $this->getCellValue($sourceSheet, $sourceColumns['quantity'], $row);
+            $productLink = $this->getCellValue($sourceSheet, $sourceColumns['product_link'], $row);
 
             $this->writeTextCell($outputSheet, 0, $outputRow, $filenameKey);
 
@@ -396,6 +399,7 @@ class DataProcessingService
                 'cleaned_sku' => $resolvedSku['cleaned_sku'] ?? '',
                 'chinese_name' => $chineseName,
                 'product_specs' => $productSpecs,
+                'product_link' => $productLink ?? '',
                 'product_image' => $productImage,
                 'quantity' => $quantity,
                 'style' => $this->lookupService->matchStyle($sku, $styleLookup) ?? '',
@@ -504,6 +508,7 @@ class DataProcessingService
             'specs' => null,
             'picture' => null,
             'quantity' => null,
+            'product_link' => null,
         ];
 
         $highestColumn = $sheet->getHighestColumn();
@@ -529,6 +534,13 @@ class DataProcessingService
                 || strpos($rawHeaderValue, '属性') !== false
             ) {
                 $indices['specs'] = $column;
+            } elseif (
+                strpos($rawHeaderValue, '销售链接') !== false
+                || strpos($rawHeaderValue, '产品链接') !== false
+                || strpos($headerValue, 'sales link') !== false
+                || strpos($headerValue, 'product link') !== false
+            ) {
+                $indices['product_link'] = $column;
             } elseif (
                 strpos($headerValue, 'picture') !== false
                 || strpos($headerValue, 'image') !== false
@@ -1686,6 +1698,10 @@ class DataProcessingService
 
             if ($header === 'sku' || $header === 'cleaned_sku') {
                 $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(22);
+            }
+
+            if ($header === '产品链接') {
+                $sheet->getColumnDimension(PHPExcel_Cell::stringFromColumnIndex($column))->setWidth(45);
             }
         }
     }

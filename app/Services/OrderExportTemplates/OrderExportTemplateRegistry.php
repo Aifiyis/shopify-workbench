@@ -18,6 +18,20 @@ class OrderExportTemplateRegistry
             new HeatTransferClothingTemplate(),
             new StyleImageHeatTransferTemplate(),
             new TextEmbroideryTemplate(),
+            new FoamHoodieTemplate(),
+            new PatchworkHoodieTemplate(),
+            new HeatTransferPantsTemplate(),
+            new DigitalPrintTShirtTemplate(),
+            new DigitalPrintSetTemplate(),
+            new DigitalPrintHoodieTemplate(),
+            new AppliqueEmbroideryTemplate(),
+            new LineEmbroideryMomTemplate(),
+            new ThreeDimensionalEmbroideryTemplate(),
+            new DoubleSidedHoodieTemplate(),
+            new TowelEmbroideryTemplate(),
+            new HemBowEmbroideryTemplate(),
+            new CarEmbroideryTemplate(),
+            new DigitalPrintShortsTemplate(),
         ]);
     }
 

@@ -71,6 +71,11 @@ class PetOutlineColorTemplate extends AbstractOrderExportTemplate
             $this->setHeaderValue($values, '图片1', $photo);
         }
 
+        $photoCaption = $this->firstExactAttributeValue($allAttributes, 'Text Under the Photo');
+        if ($photoCaption !== '') {
+            $this->setHeaderValue($values, '图片1下方文字', $photoCaption);
+        }
+
         if (($row['chinese_name'] ?? '') === '宠物轮廓') {
             $this->setHeaderValue($values, '全彩/轮廓', '轮廓');
         }

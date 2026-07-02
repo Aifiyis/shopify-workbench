@@ -667,6 +667,38 @@ class CommonOptionRulesTest extends TestCase
         $this->assertSame("Mom\n小孩名：\nAva\nBen\nCora", $this->valueForHeader($template, $row, '胸口信息'));
     }
 
+    public function test_new_template_icon_aliases_and_sleeve_positions_reuse_common_rules()
+    {
+        $resolver = new class {
+            public function resolve($cleanedSku, $optionName, $optionValue)
+            {
+                return 'storage/app/private/sku-options-image/' . strtolower($optionValue) . '.png';
+            }
+        };
+
+        $foam = new \App\Services\OrderExportTemplates\FoamHoodieTemplate();
+        $foamRow = $foam->mapRow([
+            'sku' => 'FOAM-1',
+            'cleaned_sku' => 'FOAM-1',
+            'product_specs' => "Left Sleeve Icon: Heart\nRight Sleeve Icon: Star",
+        ], ['sku_option_image_resolver' => $resolver]);
+
+        $this->assertSame('storage/app/private/sku-options-image/heart.png', $this->valueForHeader($foam, $foamRow, '左袖发泡符号'));
+        $this->assertSame('storage/app/private/sku-options-image/star.png', $this->valueForHeader($foam, $foamRow, '右袖发泡符号'));
+        $this->assertSame('左袖', $foamRow[13]);
+        $this->assertSame('右袖', $foamRow[17]);
+
+        $towel = new \App\Services\OrderExportTemplates\TowelEmbroideryTemplate();
+        $towelRow = $towel->mapRow([
+            'sku' => 'TOWEL-1',
+            'cleaned_sku' => 'TOWEL-1',
+            'product_specs' => 'Right Sleeve Icon: Moon',
+        ], ['sku_option_image_resolver' => $resolver]);
+
+        $this->assertSame('storage/app/private/sku-options-image/moon.png', $this->valueForHeader($towel, $towelRow, '右袖图标1'));
+        $this->assertSame('右袖', $towelRow[16]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

@@ -41,13 +41,14 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
         $this->setHeaderValue($values, 'sku', $row['sku'] ?? '');
         $this->setHeaderValue($values, 'cleaned_sku', $row['cleaned_sku'] ?? '');
         $this->setHeaderValue($values, '产品规格', $row['product_specs'] ?? '');
+        $this->setHeaderValue($values, '产品链接', $row['product_link'] ?? '');
 
         return $values;
     }
 
     protected function withProductSpecsHeader(array $headers)
     {
-        foreach (['产品规格', 'sku', 'cleaned_sku'] as $header) {
+        foreach (['产品规格', 'sku', 'cleaned_sku', '产品链接'] as $header) {
             if (!in_array($header, $headers, true)) {
                 $headers[] = $header;
             }
@@ -137,9 +138,9 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
                 if ($target !== '') {
                     foreach ($this->displayValuesFromOptionValues($row, $context, $name, $value, true) as $displayValue) {
                         if ($target === 'left') {
-                            $this->appendFirstHeaderValue($values, ['左袖图标', '左袖符号'], $this->formatIconValue($name, $displayValue, $lineNumber));
+                            $this->appendFirstHeaderValue($values, $this->leftSleeveIconHeaders(), $this->formatIconValue($name, $displayValue, $lineNumber));
                         } elseif ($target === 'right') {
-                            $this->appendFirstHeaderValue($values, ['右袖图标', '右袖符号'], $this->formatIconValue($name, $displayValue, $lineNumber));
+                            $this->appendFirstHeaderValue($values, $this->rightSleeveIconHeaders(), $this->formatIconValue($name, $displayValue, $lineNumber));
                         }
                     }
                 }
@@ -318,21 +319,34 @@ abstract class AbstractOrderExportTemplate implements OrderExportTemplate
 
     private function applySleevePositionColumnRules(array &$values)
     {
-        if ($this->hasAnyHeaderValue($values, ['左袖信息', '左袖文本', '左袖图标', '左袖符号'])) {
+        $leftContentHeaders = array_merge(['左袖信息', '左袖文本'], $this->leftSleeveIconHeaders());
+        $rightContentHeaders = array_merge(['右袖信息', '右袖文本'], $this->rightSleeveIconHeaders());
+
+        if ($this->hasAnyHeaderValue($values, $leftContentHeaders)) {
             $this->setSleevePositionAfterAnchor(
                 $values,
-                ['左袖图标', '左袖符号', '左袖信息', '左袖文本'],
+                array_merge($this->leftSleeveIconHeaders(), ['左袖信息', '左袖文本']),
                 '左袖'
             );
         }
 
-        if ($this->hasAnyHeaderValue($values, ['右袖信息', '右袖文本', '右袖图标', '右袖符号'])) {
+        if ($this->hasAnyHeaderValue($values, $rightContentHeaders)) {
             $this->setSleevePositionAfterAnchor(
                 $values,
-                ['右袖图标', '右袖符号', '右袖信息', '右袖文本'],
+                array_merge($this->rightSleeveIconHeaders(), ['右袖信息', '右袖文本']),
                 '右袖'
             );
         }
+    }
+
+    protected function leftSleeveIconHeaders()
+    {
+        return ['左袖图标', '左袖符号', '左袖图标1', '左袖符号1', '左袖发泡符号'];
+    }
+
+    protected function rightSleeveIconHeaders()
+    {
+        return ['右袖图标', '右袖符号', '右袖图标1', '右袖符号1', '右袖发泡符号'];
     }
 
     private function setSleevePositionAfterAnchor(array &$values, array $anchorHeaders, $position)

@@ -161,4 +161,24 @@ class PetOutlineColorTemplateTest extends TestCase
         $this->assertSame('红色', $row[27]);
         $this->assertSame('', $row[17]);
     }
+
+    public function test_text_under_the_photo_maps_to_the_first_photo_caption()
+    {
+        $template = new PetOutlineColorTemplate();
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-PET-CAPTION',
+            'sku' => 'CS-PET-CAPTION',
+            'cleaned_sku' => 'CS-PET-CAPTION',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'Text Under the Photo: Always Loved',
+            ]),
+        ], []);
+
+        $this->assertSame('Always Loved', $row[30]);
+    }
 }

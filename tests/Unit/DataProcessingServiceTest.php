@@ -80,6 +80,21 @@ class DataProcessingServiceTest extends TestCase
         $this->assertSame('', $value);
     }
 
+    public function test_source_column_indices_detect_sales_and_product_links()
+    {
+        $method = $this->getDataProcessingMethod('getSourceColumnIndices');
+
+        foreach (['销售链接', '产品链接', 'Sales Link', 'Product Link'] as $header) {
+            $spreadsheet = new \PHPExcel();
+            $sheet = $spreadsheet->getActiveSheet();
+            $sheet->fromArray(['Order ID', 'SKU', 'Product Specs', $header], null, 'A1');
+
+            $indices = $method->invoke($this->dataProcessingService, $sheet, 1);
+
+            $this->assertSame(3, $indices['product_link'], $header);
+        }
+    }
+
     public function test_groups_rows_only_for_configured_templates()
     {
         $method = $this->getDataProcessingMethod('groupRowsByTemplate');
@@ -100,15 +115,43 @@ class DataProcessingServiceTest extends TestCase
                 'chinese_name' => '人物彩图',
                 'sku' => 'PERSON-1',
             ],
+            [
+                'source_row' => 5,
+                'chinese_name' => '发泡卫衣',
+                'sku' => 'FOAM-1',
+            ],
+            [
+                'source_row' => 6,
+                'chinese_name' => '数码印T恤',
+                'sku' => 'DIGITAL-1',
+            ],
+            [
+                'source_row' => 7,
+                'chinese_name' => '亮片贴布绣',
+                'sku' => 'APPLIQUE-1',
+            ],
+            [
+                'source_row' => 8,
+                'chinese_name' => '双面卫衣-烫画',
+                'sku' => 'DOUBLE-1',
+            ],
         ];
 
         $groups = $method->invoke($this->dataProcessingService, $rows);
 
         $this->assertArrayHasKey('ctcx', $groups);
         $this->assertArrayHasKey('person_outline_color', $groups);
+        $this->assertArrayHasKey('foam_hoodie', $groups);
+        $this->assertArrayHasKey('digital_print_tshirt', $groups);
+        $this->assertArrayHasKey('applique_embroidery', $groups);
+        $this->assertArrayHasKey('double_sided_hoodie', $groups);
         $this->assertArrayNotHasKey('毛毯', $groups);
         $this->assertCount(1, $groups['ctcx']['rows']);
         $this->assertCount(1, $groups['person_outline_color']['rows']);
+        $this->assertCount(1, $groups['foam_hoodie']['rows']);
+        $this->assertCount(1, $groups['digital_print_tshirt']['rows']);
+        $this->assertCount(1, $groups['applique_embroidery']['rows']);
+        $this->assertCount(1, $groups['double_sided_hoodie']['rows']);
     }
 
     public function test_image_url_detection_accepts_ymq_links_without_file_extension()
@@ -393,7 +436,8 @@ class DataProcessingServiceTest extends TestCase
             'order_output_彩图刺绣0601_e2e.xlsx',
             "Color: White\nSize: M\nMaterial: Cotton\nThread Color: Gold\nEmbroidery Position: Middle Chest\nPhoto: https://example.test/ctcx.png",
             'RAW-CTCX-1',
-            'CS-QK2571-CX'
+            'CS-QK2571-CX',
+            'https://example.test/products/ctcx'
         );
         $this->assertHeatTransferWorkbookIncludesFixedPlacement($result['output_path']);
     }
@@ -411,7 +455,7 @@ class DataProcessingServiceTest extends TestCase
     {
         $spreadsheet = new \PHPExcel();
         $sheet = $spreadsheet->getActiveSheet();
-        $headers = ['Order ID', 'SKU', 'Product Specs', 'Picture', 'Quantity'];
+        $headers = ['Order ID', 'SKU', 'Product Specs', 'Picture', 'Quantity', 'Sales Link'];
 
         foreach ($headers as $column => $header) {
             $sheet->setCellValueByColumnAndRow($column, 1, $header);
@@ -424,6 +468,7 @@ class DataProcessingServiceTest extends TestCase
                 "Color: White\nSize: M\nMaterial: Cotton\nThread Color: Gold\nEmbroidery Position: Middle Chest\nPhoto: https://example.test/ctcx.png",
                 '',
                 1,
+                'https://example.test/products/ctcx',
             ],
             [
                 'ORDER-2',
@@ -431,6 +476,7 @@ class DataProcessingServiceTest extends TestCase
                 "Color: White\nSize: L\nMaterial: Cotton\nPhoto: https://example.test/person.png",
                 '',
                 2,
+                'https://example.test/products/person',
             ],
             [
                 'ORDER-3',
@@ -438,6 +484,7 @@ class DataProcessingServiceTest extends TestCase
                 "Color: White\nSize: XL\nMaterial: Fleece",
                 '',
                 3,
+                'https://example.test/products/blanket',
             ],
             [
                 'ORDER-4',
@@ -445,6 +492,7 @@ class DataProcessingServiceTest extends TestCase
                 "Color: Black\nSize: M\nMaterial: Cotton\nName: Alice\nYear: 1978\nPhoto: https://example.test/design.png",
                 '',
                 1,
+                'https://example.test/products/heat',
             ],
         ];
 
@@ -458,7 +506,7 @@ class DataProcessingServiceTest extends TestCase
         $writer->save($path);
     }
 
-    private function assertTemplateWorkbookIncludesReviewColumns($archivePath, $filename, $expectedSpecs, $expectedSku, $expectedCleanedSku)
+    private function assertTemplateWorkbookIncludesReviewColumns($archivePath, $filename, $expectedSpecs, $expectedSku, $expectedCleanedSku, $expectedProductLink)
     {
         $extractDirectory = $this->makeTempDirectory('template-output-extract-');
         $zip = new \ZipArchive();
@@ -474,15 +522,17 @@ class DataProcessingServiceTest extends TestCase
         $sheet = $workbook->getActiveSheet();
         $lastColumnIndex = \PHPExcel_Cell::columnIndexFromString($sheet->getHighestColumn()) - 1;
 
-        $productSpecsColumnIndex = $lastColumnIndex - 2;
+        $productSpecsColumnIndex = $lastColumnIndex - 3;
         $productSpecsColumnLetter = \PHPExcel_Cell::stringFromColumnIndex($productSpecsColumnIndex);
 
         $this->assertSame('产品规格', $sheet->getCellByColumnAndRow($productSpecsColumnIndex, 1)->getValue());
-        $this->assertSame('sku', $sheet->getCellByColumnAndRow($lastColumnIndex - 1, 1)->getValue());
-        $this->assertSame('cleaned_sku', $sheet->getCellByColumnAndRow($lastColumnIndex, 1)->getValue());
+        $this->assertSame('sku', $sheet->getCellByColumnAndRow($lastColumnIndex - 2, 1)->getValue());
+        $this->assertSame('cleaned_sku', $sheet->getCellByColumnAndRow($lastColumnIndex - 1, 1)->getValue());
+        $this->assertSame('产品链接', $sheet->getCellByColumnAndRow($lastColumnIndex, 1)->getValue());
         $this->assertSame($expectedSpecs, $sheet->getCellByColumnAndRow($productSpecsColumnIndex, 2)->getValue());
-        $this->assertSame($expectedSku, $sheet->getCellByColumnAndRow($lastColumnIndex - 1, 2)->getValue());
-        $this->assertSame($expectedCleanedSku, $sheet->getCellByColumnAndRow($lastColumnIndex, 2)->getValue());
+        $this->assertSame($expectedSku, $sheet->getCellByColumnAndRow($lastColumnIndex - 2, 2)->getValue());
+        $this->assertSame($expectedCleanedSku, $sheet->getCellByColumnAndRow($lastColumnIndex - 1, 2)->getValue());
+        $this->assertSame($expectedProductLink, $sheet->getCellByColumnAndRow($lastColumnIndex, 2)->getValue());
         $this->assertTrue($sheet->getStyleByColumnAndRow($productSpecsColumnIndex, 2)->getAlignment()->getWrapText());
         $this->assertSame(45.0, $sheet->getColumnDimension($productSpecsColumnLetter)->getWidth());
 

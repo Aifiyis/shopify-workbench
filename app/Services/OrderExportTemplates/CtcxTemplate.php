@@ -88,13 +88,19 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         ];
         $fontLines = [];
 
-        foreach ($attributes as $attribute) {
+        foreach ($attributes as $index => $attribute) {
             $name = trim((string) ($attribute['name'] ?? ''));
             $value = trim((string) ($attribute['value'] ?? ''));
             $lowerName = strtolower($name);
 
             if ($this->isSecondAndThirdLinePrompt($lowerName)) {
                 continue;
+            }
+
+            $uploadIconSide = $this->uploadIconChoiceSide($lowerName, $value);
+            if ($uploadIconSide !== '') {
+                $uploadedIcon = $this->uploadedSleeveIconAfter($attributes, $index, $uploadIconSide, $row, $context);
+                $this->setHeaderValue($values, $uploadIconSide === 'left' ? '左袖图标' : '右袖图标', $uploadedIcon);
             }
 
             if ($name === 'Choose State Options') {
@@ -138,6 +144,43 @@ class CtcxTemplate extends AbstractOrderExportTemplate
         }
 
         return $values;
+    }
+
+    private function uploadIconChoiceSide($lowerName, $value)
+    {
+        if (strpos($lowerName, 'choose') === false
+            || strpos($lowerName, 'icon') === false
+            || strcasecmp(trim((string) $value), 'Upload Your Icon') !== 0) {
+            return '';
+        }
+
+        if (strpos($lowerName, 'left sleeve') !== false) {
+            return 'left';
+        }
+
+        if (strpos($lowerName, 'right sleeve') !== false) {
+            return 'right';
+        }
+
+        return '';
+    }
+
+    private function uploadedSleeveIconAfter(array $attributes, $index, $side, array $row, array $context)
+    {
+        $nextAttribute = $attributes[$index + 1] ?? [];
+        $nextName = trim((string) ($nextAttribute['name'] ?? ''));
+        $nextValue = trim((string) ($nextAttribute['value'] ?? ''));
+        $lowerNextName = strtolower($nextName);
+
+        if ($nextValue === ''
+            || strpos($lowerNextName, 'upload your icon') === false
+            || strpos($lowerNextName, $side . ' sleeve') === false) {
+            return '';
+        }
+
+        $imagePath = $this->resolveOptionImage($context, $row, $nextName, $nextValue);
+
+        return $imagePath !== '' ? $imagePath : $nextValue;
     }
 
     private function applyDefaultChestPosition(array $values)

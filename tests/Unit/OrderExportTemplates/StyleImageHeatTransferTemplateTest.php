@@ -327,6 +327,36 @@ class StyleImageHeatTransferTemplateTest extends TestCase
         $this->assertSame('红色, 酒红色（翻译原值：Burgundy）', $this->valueForHeader($template, $row, '后背信息'));
     }
 
+    public function test_choose_style_maps_option_image_to_design_style()
+    {
+        $template = new StyleImageHeatTransferTemplate();
+        $resolver = new class {
+            public function resolve($cleanedSku, $optionName, $optionValue)
+            {
+                return $optionName === 'Choose Style' && $optionValue === 'Vintage'
+                    ? 'storage/app/private/sku-options-image/vintage.png'
+                    : '';
+            }
+        };
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-STYLE-CHOOSE',
+            'sku' => 'CS-STYLE-CHOOSE',
+            'cleaned_sku' => 'CS-STYLE-CHOOSE',
+            'product_specs' => implode("\n", [
+                'Color: Black',
+                'Size: M',
+                'Material: Cotton',
+                'Choose Style: Vintage',
+            ]),
+        ], [
+            'sku_option_image_resolver' => $resolver,
+        ]);
+
+        $this->assertSame('storage/app/private/sku-options-image/vintage.png', $row[15]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

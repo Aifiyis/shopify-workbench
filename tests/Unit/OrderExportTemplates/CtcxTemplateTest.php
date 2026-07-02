@@ -295,6 +295,43 @@ class CtcxTemplateTest extends TestCase
         $this->assertSame('胸部中央', $this->valueForHeader($template, $row, '胸部位置'));
     }
 
+    public function test_upload_your_icon_choice_uses_the_following_side_specific_upload_value()
+    {
+        $template = new CtcxTemplate();
+        $resolver = new class {
+            public function resolve($cleanedSku, $optionName, $optionValue)
+            {
+                $images = [
+                    'Upload Your Icon on Left Sleeve|https://example.test/left.png' => 'storage/app/private/sku-options-image/left.png',
+                    'Upload Your Icon on Right Sleeve|https://example.test/right.png' => 'storage/app/private/sku-options-image/right.png',
+                ];
+
+                return $images[$optionName . '|' . $optionValue] ?? '';
+            }
+        };
+
+        $row = $template->mapRow([
+            'filename_key' => '0601',
+            'order_id' => 'ORDER-UPLOAD-ICON',
+            'sku' => 'CS-UPLOAD-ICON',
+            'cleaned_sku' => 'CS-UPLOAD-ICON',
+            'product_specs' => implode("\n", [
+                'Color: White',
+                'Size: M',
+                'Material: Cotton',
+                'Choose Icon on Left Sleeve: Upload Your Icon',
+                'Upload Your Icon on Left Sleeve: https://example.test/left.png',
+                'Choose Icon on Right Sleeve: Upload Your Icon',
+                'Upload Your Icon on Right Sleeve: https://example.test/right.png',
+            ]),
+        ], [
+            'sku_option_image_resolver' => $resolver,
+        ]);
+
+        $this->assertSame('storage/app/private/sku-options-image/left.png', $row[10]);
+        $this->assertSame('storage/app/private/sku-options-image/right.png', $row[15]);
+    }
+
     private function valueForHeader($template, array $row, $header)
     {
         $index = array_search($header, $template->headers(), true);

@@ -77,7 +77,7 @@ class StyleImageHeatTransferTemplate extends AbstractOrderExportTemplate
                 );
             }
 
-            if (strpos($lowerName, 'design') !== false) {
+            if (strpos($lowerName, 'design') !== false || strcasecmp($name, 'Choose Style') === 0) {
                 $imagePath = $this->resolveOptionImage($context, $row, $name, $value);
 
                 $this->setHeaderValue($values, '设计风格', $imagePath !== '' ? $imagePath : $value);
